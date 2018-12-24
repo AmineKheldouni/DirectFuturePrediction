@@ -1,6 +1,6 @@
 import sys as _sys
 
-_COMPILED_PYTHON_VERSION = "3.5.4"
+_COMPILED_PYTHON_VERSION = "3.5.2"
 
 _this_python_version = "{}.{}.{}".format(*_sys.version_info[0:3])
 
