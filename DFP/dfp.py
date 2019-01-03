@@ -9,7 +9,8 @@ from random import choice
 import numpy as np
 from collections import deque
 import time
-
+import csv
+import os
 import json
 from keras.models import model_from_json
 from keras.models import Sequential, load_model, Model
@@ -18,7 +19,7 @@ from keras.layers import Convolution2D, Dense, Flatten, merge, MaxPooling2D, Inp
 from keras.optimizers import SGD, Adam, rmsprop
 from keras import backend as K
 import keras
-
+import pandas as pd
 from vizdoom import DoomGame, ScreenResolution
 from vizdoom import *
 import itertools as it
@@ -45,7 +46,7 @@ def preprocessImg(img, size):
     img = skimage.color.rgb2gray(img)
 
     return img
-    
+
 
 class DFPAgent:
 
@@ -65,7 +66,7 @@ class DFPAgent:
         self.final_epsilon = 0.0001
         self.batch_size = 32
         self.observe = 2000
-        self.explore = 50000 
+        self.explore = 50000
         self.frame_per_action = 4
         self.timestep_per_train = 5 # Number of timesteps between training interval
 
@@ -116,9 +117,9 @@ class DFPAgent:
         rand_indices = np.random.choice(len(self.memory)-(self.timesteps[-1]+1), self.batch_size)
 
         state_input = np.zeros(((batch_size,) + self.state_size)) # Shape batch_size, img_rows, img_cols, 4
-        measurement_input = np.zeros((batch_size, self.measurement_size)) 
+        measurement_input = np.zeros((batch_size, self.measurement_size))
         goal_input = np.tile(goal, (batch_size, 1))
-        f_action_target = np.zeros((batch_size, (self.measurement_size * len(self.timesteps)))) 
+        f_action_target = np.zeros((batch_size, (self.measurement_size * len(self.timesteps))))
         action = []
 
         for i, idx in enumerate(rand_indices):
@@ -178,7 +179,11 @@ if __name__ == '__main__':
 
     game = DoomGame()
     game.load_config("vizdoom/scenarios/health_gathering.cfg")
-    game.set_sound_enabled(True)
+
+    # TODO : Change amo/frags values when dealing with D3
+    amo = 0
+    frags = 0
+    game.set_sound_enabled(False)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
     game.init()
@@ -190,7 +195,7 @@ if __name__ == '__main__':
 
     action_size = game.get_available_buttons_size() # [Turn Left, Turn Right, Move Forward]
     measurement_size = 3 # [Health, Medkit, Poison]
-    timesteps = [1,2,4,8,16,32]
+    timesteps = [1, 2, 4, 8, 16, 32]
     goal_size = measurement_size * len(timesteps)
 
     img_rows , img_cols = 84, 84
@@ -201,6 +206,7 @@ if __name__ == '__main__':
     agent = DFPAgent(state_size, measurement_size, action_size, timesteps)
 
     agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps), agent.learning_rate)
+    # agent.load_model('./models/dfp.h5')
 
     x_t = game_state.screen_buffer # 480 x 640
     x_t = preprocessImg(x_t, size=(img_rows, img_cols))
@@ -216,8 +222,8 @@ if __name__ == '__main__':
     # Initial normalized measurements
     m_t = np.array([misc[0]/30.0, medkit/10.0, poison])
 
-    # Goal 
-    goal = np.array([1.0, 1.0, -1.0] * len(timesteps)) 
+    # Goal
+    goal = np.array([1.0, 1.0, -1.0] * len(timesteps))
 
     # Goal for Inference (Can change during test-time)
     inference_goal = goal
@@ -231,11 +237,25 @@ if __name__ == '__main__':
     max_life = 0 # Maximum episode life (Proxy for agent performance)
     life = 0
 
-    # Buffer to compute rolling statistics 
+    # Buffer to compute rolling statistics
     life_buffer = []
 
-    while not game.is_episode_finished():
+    if not os.path.exists('./experiments/'+title):
+        os.mkdir('./experiments/'+title)
+    if not os.path.exists('./experiments/'+title+'/model'):
+        os.mkdir('./experiments/'+title+'/model')
+    if not os.path.exists('./experiments/'+title+'/logs'):
+        os.mkdir('./experiments/'+title+'/logs')
+    if not os.path.exists('./experiments/'+title+'/statistics'):
+        os.mkdir('./experiments/'+title+'/statistics')
 
+    csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
+                                     'Reward', 'Medkit', 'Poison', 'Frags',
+                                     'Amo', 'Max Life', 'Life', 'Mean Score',
+                                     'Var Score', 'Loss'])
+    csv_file.to_csv('./experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+
+    while not game.is_episode_finished():
         loss = 0
         r_t = 0
         a_t = np.zeros([action_size])
@@ -252,7 +272,7 @@ if __name__ == '__main__':
         game_state = game.get_state()  # Observe again after we take the action
         is_terminated = game.is_episode_finished()
 
-        r_t = game.get_last_reward() 
+        r_t = game.get_last_reward()
 
         if (is_terminated):
             if (life > max_life):
@@ -277,6 +297,7 @@ if __name__ == '__main__':
         if (misc[0] > prev_misc[0]): # Pick up Health Pack
             medkit += 1
 
+        previous_life = life
         if (is_terminated):
             life = 0
         else:
@@ -293,14 +314,14 @@ if __name__ == '__main__':
         # Do the training
         if t > agent.observe and t % agent.timestep_per_train == 0:
             loss = agent.train_minibatch_replay(goal)
-            
+
         s_t = s_t1
         t += 1
 
         # save progress every 10000 iterations
-        if t % 10000 == 0:
-            print("Now we save model")
-            agent.model.save_weights("models/dfp.h5", overwrite=True)
+        if t % 1000 == 0:
+            print("Saving the model's parameters ...")
+            agent.model.save_weights('./experiments/'+title+'/model/DFP.h5', overwrite=True)
 
         # print info
         state = ""
@@ -316,11 +337,18 @@ if __name__ == '__main__':
                   "/ EPSILON", agent.epsilon, "/ ACTION", action_idx, "/ REWARD", r_t, \
                   "/ Medkit", medkit, "/ Poison", poison, "/ LIFE", max_life, "/ LOSS", loss)
 
+            with open('./experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
+                writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                writer.writerow([t, state, agent.epsilon, action_idx, r_t,
+                                 medkit, poison, frags, amo, max_life, previous_life,
+                                 np.mean(np.array(life_buffer)),
+                                 np.var(np.array(life_buffer)), loss])
+
             medkit = 0
             poison = 0
 
             # Save Agent's Performance Statistics
-            if GAME % agent.stats_window_size == 0 and t > agent.observe: 
+            if GAME % agent.stats_window_size == 0 and t > agent.observe:
                 print("Update Rolling Statistics")
                 agent.mavg_score.append(np.mean(np.array(life_buffer)))
                 agent.var_score.append(np.var(np.array(life_buffer)))
@@ -329,9 +357,8 @@ if __name__ == '__main__':
                 life_buffer = []
 
                 # Write Rolling Statistics to file
-                with open("statistics/results_"+ title + ".txt", "w+") as stats_file:
+                with open('./experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
                     stats_file.write('Game: ' + str(GAME) + '\n')
                     stats_file.write('Max Score: ' + str(max_life) + '\n')
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
                     stats_file.write('var_score: ' + str(agent.var_score) + '\n')
-

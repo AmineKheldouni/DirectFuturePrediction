@@ -1,4 +1,0 @@
-Game: 50
-Max Score: 223
-mavg_score: [115.8]
-var_score: [599.04]
