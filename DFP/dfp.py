@@ -178,11 +178,8 @@ if __name__ == '__main__':
     K.set_session(sess)
 
     game = DoomGame()
-    game.load_config("vizdoom/scenarios/health_gathering.cfg")
+    game.load_config("vizdoom/scenarios/D3_battle.cfg")
 
-    # TODO : Change amo/frags values when dealing with D3
-    amo = 0
-    frags = 0
     game.set_sound_enabled(False)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
@@ -190,12 +187,12 @@ if __name__ == '__main__':
 
     game.new_episode()
     game_state = game.get_state()
-    misc = game_state.game_variables  # [Health]
+    misc = game_state.game_variables  # [Amo, Health, Frags]
     prev_misc = misc
 
     action_size = game.get_available_buttons_size() # [Turn Left, Turn Right, Move Forward]
-    measurement_size = 3 # [Health, Medkit, Poison]
-    timesteps = [1, 2, 4, 8, 16, 32]
+    measurement_size = 3 # [Amo, Health, Frags]
+    timesteps = [1, 2, 4, 8, 16]
     goal_size = measurement_size * len(timesteps)
 
     img_rows , img_cols = 84, 84
@@ -219,11 +216,19 @@ if __name__ == '__main__':
     # Number of poison pickup as measurement
     poison = 0
 
+    # TODO : Change amo/frags values when dealing with D3
+    # Number of medkit pickup as measurement
+    amo = 0
+
+    # Number of poison pickup as measurement
+    frags = 0
+
     # Initial normalized measurements
-    m_t = np.array([misc[0]/30.0, medkit/10.0, poison])
+    # [AMO, HEALTH, FRAGS]
+    m_t = np.array([misc[0]/20.0, misc[1]/30.0, misc[2]/10.0])
 
     # Goal
-    goal = np.array([1.0, 1.0, -1.0] * len(timesteps))
+    goal = np.array([0.5, 0.5, 1.0] * len(timesteps))
 
     # Goal for Inference (Can change during test-time)
     inference_goal = goal
@@ -240,6 +245,10 @@ if __name__ == '__main__':
     # Buffer to compute rolling statistics
     life_buffer = []
 
+    load_weights = False
+    if load_weights:
+        agent.model.load_weights('./experiments/'+title+'/model/DFP.h5')
+        
     if not os.path.exists('./experiments/'+title):
         os.mkdir('./experiments/'+title)
     if not os.path.exists('./experiments/'+title+'/model'):
@@ -259,7 +268,6 @@ if __name__ == '__main__':
         loss = 0
         r_t = 0
         a_t = np.zeros([action_size])
-
         # Epsilon Greedy
         action_idx  = agent.get_action(s_t, m_t, goal, inference_goal)
         a_t[action_idx] = 1
@@ -280,6 +288,9 @@ if __name__ == '__main__':
             GAME += 1
             life_buffer.append(life)
             print ("Episode Finish ")
+            ammo = misc[0]
+            hp = misc[1]
+            frags = misc[2]
             game.new_episode()
             game_state = game.get_state()
             misc = game_state.game_variables
@@ -291,11 +302,6 @@ if __name__ == '__main__':
         x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
         x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
         s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
-
-        if (prev_misc[0] - misc[0] > 8): # Pick up Poison
-            poison += 1
-        if (misc[0] > prev_misc[0]): # Pick up Health Pack
-            medkit += 1
 
         previous_life = life
         if (is_terminated):
@@ -309,7 +315,7 @@ if __name__ == '__main__':
         # save the sample <s, a, r, s'> to the replay memory and decrease epsilon
         agent.replay_memory(s_t, action_idx, r_t, s_t1, m_t, is_terminated)
 
-        m_t = np.array([misc[0]/30.0, medkit/10.0, poison]) # Measurement after transition
+        m_t = np.array([misc[0]/20.0, misc[1]/30.0, misc[2]/10.0]) # Measurement after transition
 
         # Do the training
         if t > agent.observe and t % agent.timestep_per_train == 0:
@@ -318,8 +324,8 @@ if __name__ == '__main__':
         s_t = s_t1
         t += 1
 
-        # save progress every 10000 iterations
-        if t % 1000 == 0:
+        # save progress every 5000 iterations
+        if t % 5000 == 0:
             print("Saving the model's parameters ...")
             agent.model.save_weights('./experiments/'+title+'/model/DFP.h5', overwrite=True)
 
@@ -335,7 +341,7 @@ if __name__ == '__main__':
         if (is_terminated):
             print("TIME", t, "/ GAME", GAME, "/ STATE", state, \
                   "/ EPSILON", agent.epsilon, "/ ACTION", action_idx, "/ REWARD", r_t, \
-                  "/ Medkit", medkit, "/ Poison", poison, "/ LIFE", max_life, "/ LOSS", loss)
+                  "\ AMMO", ammo, "/ LIFE", hp, "\ FRAGS", frags, "/ MAX LIFE", max_life, "/ LOSS", loss)
 
             with open('./experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -344,8 +350,8 @@ if __name__ == '__main__':
                                  np.mean(np.array(life_buffer)),
                                  np.var(np.array(life_buffer)), loss])
 
-            medkit = 0
-            poison = 0
+            # medkit = 0
+            # poison = 0
 
             # Save Agent's Performance Statistics
             if GAME % agent.stats_window_size == 0 and t > agent.observe:
