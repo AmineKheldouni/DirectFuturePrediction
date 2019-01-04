@@ -1,0 +1,5 @@
+to dowload weight
+https://github.com/iro-cp/FCRN-DepthPrediction
+
+to predict depth map
+python predict.py NYU_FCRN.ckpt yourimage.jpg
