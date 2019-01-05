@@ -1,0 +1,66 @@
+TODO :
+
+pour la phase de test faudrait juste rajouter un self.test=False/True, self.n_tests et commenter la loss pour True je pense
+
+en gros c'est le temps pour que epsilon descende à 0
+donc en fait apres self.explore, on prend l'action optimale mais on train quand meme
+de 0 à self.observe on prend eps=1 et on train pas
+de self.observe à self.observe+self.explore
+on train mais on decroit eps de 1 à 0
+après ca on train avec eps=0
+
+
+\section{CSV file}
+
+Exp : stats + weights
+
+Params experience :
+- goal
+- episode où change goals
+
+Train. Criteres perf.:
+- t
+- measurements de l'exp (health, health pack, poison)
+- health
+- reward (sum jusq'à t, t2=0 à chaque fin d'épisode) 
+
+\section{Experiments}
+
+DFP/DDQN 2 env D1 et D3
+
+Effet ajout mesures
+D1 : [Health]
+D1 : [Health, HealthPacks, Poison].
+D1 : [Health, HealthPacks, distance nearest HealthPack, Poison]
+
+Effet difficulté du but par rapport à exp1
+D3 : [Health, Frags, Amo]
+D3 : [Health, Frags, Amo, distance ennemy, distance healthpack].
+
+--- 
+CHANGEMENT BUT DURANT LE TRAIN sur D3 (Amine)
+
+D3 : [Health, Frags, Amo]
+
+- Fixed goal : Si on ne change pas de but
+ CF ARTICLE
+- Change but 
+  CF ARTICLE
+A la fin, on veut savoir sur le but TestGoal (plusieurs tests si possible) lequel a gagné.
+
+(changer de but => meilleurs résultats ?)
+
+----
+ANTICIPATION
+
+D1 [1,2,4]
+VS
+D1 [1,2,4,8,16,32]
+VS
+D1 [1,2,4,8,16,32,64] (cf token Google)
+
+---------
+
+
+Amine : taille vecteur actions
+action_size = game.get_available_buttons_size()
