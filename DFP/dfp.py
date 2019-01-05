@@ -64,7 +64,7 @@ class DFPAgent:
 
         # experience replay buffer
         self.memory = deque()
-        self.max_memory = 20000
+        self.max_memory = 30000
 
         # create model
         self.model = None
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     frags = 0
     game.set_sound_enabled(False)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
-    game.set_window_visible(False)
+    game.set_window_visible(True)
     game.init()
 
     game.new_episode()
@@ -257,7 +257,7 @@ if __name__ == '__main__':
         a_t = np.zeros([action_size])
 
         # Epsilon Greedy
-        action_idx  = agent.get_action(s_t, m_t, goal, inference_goal)
+        action_idx  = agent.get_action(s_t, m_t, np.array(list(np.random.uniform(0,1,3))*len(timesteps)), inference_goal)
         a_t[action_idx] = 1
 
         a_t = a_t.astype(int)
