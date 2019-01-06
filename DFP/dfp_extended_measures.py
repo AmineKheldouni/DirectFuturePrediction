@@ -30,16 +30,6 @@ from networks import Networks
 
 #to check if keras is using GPU
 
-
-def preprocessImg(img, size):
-
-    img = np.rollaxis(img, 0, 3)    # It becomes (640, 480, 3)
-    img = skimage.transform.resize(img,size)
-    img = skimage.color.rgb2gray(img)
-
-    return img
-
-
 class DFPAgent:
 
     def __init__(self, state_size, measurement_size, action_size, timesteps):
@@ -152,6 +142,23 @@ class DFPAgent:
     def save_model(self, name):
         self.model.save_weights(name)
 
+
+def preprocessImg(img, size):
+
+    img = np.rollaxis(img, 0, 3)    # It becomes (640, 480, 3)
+    img = skimage.transform.resize(img,size)
+    img = skimage.color.rgb2gray(img)
+
+    return img
+
+################################################################
+#FOR COMPUTATION OF DEPTH MAP
+
+from depth_map import *
+
+################################################################""
+#python3 dfp_extended_measures.py test 1 1
+
 import argparse
 import sys
 
@@ -159,12 +166,7 @@ if __name__ == '__main__':
 
     title = sys.argv[1]
     n_measures = int(sys.argv[2]) #number of measurements
-
-    # Avoid Tensorflow eats up GPU memory
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    sess = tf.Session(config=config)
-    K.set_session(sess)
+    more_perception = int(sys.argv[3])
 
     game = DoomGame()
     game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
@@ -197,11 +199,36 @@ if __name__ == '__main__':
     agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps), agent.learning_rate)
     # agent.load_model('./models/dfp.h5')
 
-    x_t = game_state.screen_buffer # 480 x 640
-    x_t = preprocessImg(x_t, size=(img_rows, img_cols))
-    s_t = np.stack(([x_t]*4), axis=2) # It becomes 64x64x4
-    s_t = np.expand_dims(s_t, axis=0) # 1x64x64x4
+    x_t = game_state.screen_buffer  # 480 x 640
 
+    if more_perception:
+        img0 =  np.rollaxis(x_t, 0, 3)
+        #npimg = np.round(255 * img0)
+        #img = Image.fromarray(npimg, 'RGB')
+
+        img0 = skimage.color.rgb2gray(img0)
+        print(img0.shape)
+        npimg = np.round(255 * img0)
+        img = Image.fromarray(npimg).convert("RGB")
+
+        #img.show()
+        img.save("tmp.jpg")
+        img = Image.open("tmp.jpg")
+        depth_t = predict_depth_map(img)
+
+        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+        depth_t = transform.resize(depth_t, (img_rows, img_cols))
+
+        s_t = np.zeros((2,img_rows, img_cols,4))
+        s_t[0, :] = np.stack(([x_t]*4), axis=2)
+        s_t[1, :] = np.stack(([depth_t] * 4), axis=2)
+    else:
+        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+
+        s_t = np.stack(([x_t]*4), axis=2) # It becomes 64x64x4
+        s_t = np.expand_dims(s_t, axis=0) # 1x64x64x4
+        
+    
     # Number of medkit pickup as measurement
     medkit = 0
 
@@ -284,9 +311,21 @@ if __name__ == '__main__':
         x_t1 = game_state.screen_buffer
         misc = game_state.game_variables
 
-        x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
-        x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
-        s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
+        if more_perception:
+            depth_t1 = predict_depth_map(x_t1)
+            depth_t1 = transform.resize(depth_t1, (img_rows, img_cols))
+
+            p_t1 = np.zeros((2, img_rows, img_cols, 1))
+            p_t1[0, :] = np.expand_dims(x_t1, axis=2)
+            p_t1[1, :] = np.expand_dims(depth_t1, axis=2)
+
+            s_t1 = np.append(p_t1, s_t[:, :, :, :3], axis=3)
+
+        else:
+            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+            x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+            s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
+
 
         if (prev_misc[0] - misc[0] > 8): # Pick up Poison
             poison += 1
@@ -311,8 +350,22 @@ if __name__ == '__main__':
             m_t = np.array([misc[0] / 30.0])
 
         # Do the training
+
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        # Avoid Tensorflow eats up GPU memory
+        sess = tf.Session(config=config)
+        K.set_session(sess)
+
         if t > agent.observe and t % agent.timestep_per_train == 0:
             loss = agent.train_minibatch_replay(goal)
+
+        tf.global_variables_initializer().run()
+        model_saver = tf.train.Saver(tf.global_variables())
+        model_ckpt = tf.train.get_checkpoint_state()
+        model_saver.restore(sess, model_ckpt.model_checkpoint_path)
+
+        sess.close()
 
         s_t = s_t1
         t += 1
