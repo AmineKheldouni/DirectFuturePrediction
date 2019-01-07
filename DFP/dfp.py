@@ -258,6 +258,10 @@ if __name__ == '__main__':
 
         # Epsilon Greedy
         action_idx  = agent.get_action(s_t, m_t, goal, inference_goal)
+
+        # Epsilon Greedy
+        # OR AMINE :
+        # action_idx = agent.get_action(s_t, m_t, np.array(list(np.random.uniform(0, 1, 3)) * len(timesteps)),inference_goal)
         a_t[action_idx] = 1
 
         a_t = a_t.astype(int)
