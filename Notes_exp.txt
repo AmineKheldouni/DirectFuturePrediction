@@ -1,3 +1,51 @@
+game.get_last_reward() 
+game.is_terminated -> reward -96/4 selon dead/en vie
+
+
+
+
+1° pourquoi l'agent ne pick jamais de poison
+ou alors c'est son inférence qui est merdique
+if (prev_misc[0] - misc[0] > 8): # Pick up Poison
+            poison += 1
+
+2 °
+For comparison sake, I also ran the same number of episodes using Double DQN (DDQN). A scalar reward of +1 is given to the agent when it picks up Health Packs, and a negative penalty of -100 for dying. Average survival time (moving average over 50 episodes) is used as the metric for performance
+dans DFP il a l'air de juste faire : r_t = game.get_last_reward()
+mais dans DDQN il fait ca
+r_t = game.get_last_reward()  ; r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t) où il "enrichit la reward" cf. article de l'autre blog "By default, a death penalty of -1 is provided by the environment. In order to facilitate learning, I enriched the variety of rewards (reward shaping) to include a +1 reward for every kill, and a -0.1 reward for losing ammo and health. "
+Ainsi dans l'article qui nous intéresse, faut-il enrichir que pour DDQN ? (pas pour DFP ?).
+
+[3° pourquoi la health est pas nulle quand il crève ?]
+
+[4° By default, a death penalty of -1 is provided by the environment. Pourtant quand je regarde la reward apreès is_terminated j'ai -96. at'il deja modifié l'environnement de game.last_reward() ?]
+
+
+
+
+je suis surement idiot mais pourquoi la reward peut etre positive quand is_terminated ? et le temps de survie est-il borné ?
+
+j'ai mal expliqué. en gros dans dqn il prend pas la reward de l'environnement (-1 si mort) mais la détaille en fonction des mesures. je me demandais pourquoi il le faisait pas pour dfp
+
+ La health est nulle mais on la voit pas parce qu'on ne print pas le dernier état de l'agent lors du dernier épisode du jeu.° j'ai pas pigé. j'obtiens dans dfp print ("Episode Finish ", misc)-> misc=4
+
+peut etre entre ddqn et dfp, mais dfp avec 3 mesures est plus mauvais que dfp avec 1 mesure ce qui me semble toutefois normal vu que ya pas de poison
+
+
+
+
+----------------
+EXP
+PARTIE PREDICTIVE TEST
+
+
+UNDERSTAND REWARD.
+les valeurs de life,poison,...
+
+NETWORK FOR MULTIPLE CHANNELS !
+ANTICIPATION.
+----------------
+
 TODO :
 
 pour la phase de test faudrait juste rajouter un self.test=False/True, self.n_tests et commenter la loss pour True je pense

@@ -1,6 +1,0 @@
-Game: 250
-Max Score: 524
-mavg_score: [127.48, 158.84, 197.38, 154.46, 188.14]
-var_score: [756.2495999999999, 4511.9744, 14045.595599999999, 6611.888400000001, 16587.2804]
-mavg_ammo_left: [nan, nan, nan, nan, nan]
-mavg_kill_counts: [nan, nan, nan, nan, nan]

@@ -105,11 +105,11 @@ class DoubleDQNAgent:
 
     def shape_reward_d1(self, r_t, misc, prev_misc, t):
 
-        if r_t==-96: #die
-            r_t = r_t - 100
-        
-        elif (misc[0] > prev_misc[0]): #medkit
-            r_t = r_t + 1
+        if (prev_misc[0] - misc[0] > 8): #medkit
+            r_t = r_t - 10
+
+        if (misc[0] > prev_misc[0]): #medkit
+            r_t = r_t + 10
 
         return r_t
 
@@ -222,6 +222,7 @@ import csv
 if __name__ == "__main__":
 
     title = sys.argv[1]
+    reshaped_reward = int(sys.argv[2])
 
     # Avoid Tensorflow eats up GPU memory
     config = tf.ConfigProto()
@@ -230,6 +231,7 @@ if __name__ == "__main__":
     K.set_session(sess)
 
     game = DoomGame()
+    #game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
     game.load_config("vizdoom/scenarios/health_gathering.cfg")
 
     #game.load_config("vizdoom/scenarios/defend_the_center.cfg")
@@ -282,20 +284,20 @@ if __name__ == "__main__":
     # Buffer to compute rolling statistics 
     life_buffer, ammo_buffer, kills_buffer = [], [], [] 
 
-    if not os.path.exists('./experiments/'+title):
-        os.mkdir('./experiments/'+title)
+    if not os.path.exists('../experiments/'+title):
+        os.mkdir('../experiments/'+title)
     if not os.path.exists('./experiments/'+title+'/model'):
-        os.mkdir('./experiments/'+title+'/model')
+        os.mkdir('../experiments/'+title+'/model')
     if not os.path.exists('./experiments/'+title+'/logs'):
-        os.mkdir('./experiments/'+title+'/logs')
+        os.mkdir('../experiments/'+title+'/logs')
     if not os.path.exists('./experiments/'+title+'/statistics'):
-        os.mkdir('./experiments/'+title+'/statistics')
+        os.mkdir('../experiments/'+title+'/statistics')
 
     csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
                                      'Reward', 'Medkit', 'Poison', 'Frags',
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
                                      'Var Score', 'Loss'])
-    csv_file.to_csv('./experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+    csv_file.to_csv('../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
 
     while not game.is_episode_finished():
 
@@ -338,7 +340,10 @@ if __name__ == "__main__":
         x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
         s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
 
-        r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t)
+        if reshaped_reward:
+            r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t)
+        else:
+            pass
 
         if (prev_misc[0] - misc[0] > 8): # Pick up Poison
             poison += 1
@@ -368,7 +373,7 @@ if __name__ == "__main__":
         
         if t % 10000 == 0:
             print("Saving the model's parameters ...")
-            agent.model.save_weights('./experiments/'+title+'/model/ddqn.h5', overwrite=True)
+            agent.model.save_weights('../experiments/'+title+'/model/ddqn.h5', overwrite=True)
 
         # print info
         state = ""
@@ -391,7 +396,7 @@ if __name__ == "__main__":
                mean_life = None
                var_life = None
 
-            with open('./experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
+            with open('../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 writer.writerow([t, state, agent.epsilon, action_idx, r_t,
                                  medkit, poison, frags, amo, max_life, previous_life,
@@ -412,7 +417,7 @@ if __name__ == "__main__":
                 life_buffer, ammo_buffer, kills_buffer = [], [], [] 
 
                 # Write Rolling Statistics to file
-                with open('./experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
+                with open('../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
                     stats_file.write('Game: ' + str(GAME) + '\n')
                     stats_file.write('Max Score: ' + str(max_life) + '\n')
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
