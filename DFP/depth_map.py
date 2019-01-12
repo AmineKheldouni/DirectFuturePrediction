@@ -7,7 +7,32 @@ from PIL import Image
 
 import models_depth
 
-def predict_depth_map(image):
+
+def init_depth_map(sess):
+    # Default input size
+    height = 228
+    width = 304
+    channels = 3
+    batch_size = 1
+
+    # Create a placeholder for the input image
+    input_node = tf.placeholder(tf.float32, shape=(None, height, width, channels))
+
+    # Construct the network
+    net = models_depth.ResNet50UpProj({'data': input_node}, batch_size, 1, False)
+
+    # Load the converted parameters
+    print('Loading the model')
+
+    # Use to load from ckpt file
+    saver = tf.train.Saver()
+    saver.restore(sess, "NYU_FCRN.ckpt")
+
+    return input_node, net
+
+
+
+def predict_depth_map(image, sess, input_node, net):
     # Default input size
     height = 228
     width = 304
@@ -18,38 +43,63 @@ def predict_depth_map(image):
     img = np.array(img).astype('float32')
     img = np.expand_dims(np.asarray(img), axis=0)
 
-    sess2 = tf.Session()
+    # Prediction
 
+    pred = None
+
+    # Evalute the network for the given image
+    pred = sess.run(net.get_output(), feed_dict={input_node: img})
+
+    #sess.close()
+
+    if False:
+        # Plot result
+        fig = plt.figure()
+        ii = plt.imshow(pred[0, :, :, 0], interpolation='nearest')
+        fig.colorbar(ii)
+        plt.show()
+        fig.savefig("depth.jpg")
+    else:
+        print("depth map computed")
+
+    return pred
+
+
+
+
+
+
+    '''
     # Create a placeholder for the input image
     input_node = tf.placeholder(tf.float32, shape=(None, height, width, channels))
 
     # Construct the network
     net = models_depth.ResNet50UpProj({'data': input_node}, batch_size, 1, False)
 
-    #with tf.Session() as sess2:
+    with tf.Graph().as_default() as net_graph:
 
-    # Load the converted parameters
-    print('Loading the model')
+        # Load the converted parameters
+        print('Loading the model')
 
-    # Use to load from ckpt file
-    tf.global_variables_initializer().run()
-    saver = tf.train.Saver(tf.global_variables())
-    saver.restore(sess2, "NYU_FCRN.ckpt")
+        sess = tf.Session(graph=net_graph)
 
-    # Use to load from npy file
-    # net.load(model_data_path, sess)
+        # Use to load from ckpt file
+        saver = tf.train.Saver()
+        saver.restore(sess, "NYU_FCRN.ckpt")
 
-    # Evalute the network for the given image
-    pred = sess2.run(net.get_output(), feed_dict={input_node: img})
+        # Use to load from npy file
+        # net.load(model_data_path, sess)
 
-    # Plot result
-    fig = plt.figure()
-    ii = plt.imshow(pred[0, :, :, 0], interpolation='nearest')
-    fig.colorbar(ii)
-    plt.show()
+        # Evalute the network for the given image
+        pred = sess.run(net.get_output(), feed_dict={input_node: img})
 
-    sess2.close()
+        # Plot result
+        fig = plt.figure()
+        ii = plt.imshow(pred[0, :, :, 0], interpolation='nearest')
+        fig.colorbar(ii)
+        plt.show()
+
 
     return pred
-
+    '''
     #https://stackoverflow.com/questions/41607144/loading-two-models-from-saver-in-the-same-tensorflow-session

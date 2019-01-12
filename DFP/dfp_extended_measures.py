@@ -47,10 +47,10 @@ class DFPAgent:
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
         self.batch_size = 32
-        self.observe = 2000
+        self.observe = 100 #2000
         self.explore = 50000
         self.frame_per_action = 4
-        self.timestep_per_train = 5 # Number of timesteps between training interval
+        self.timestep_per_train = 5 #5 # Number of timesteps between training interval
 
         # experience replay buffer
         self.memory = deque()
@@ -121,6 +121,7 @@ class DFPAgent:
                     if j in self.timesteps: # 1,2,4,8,16,32
                         future_measurements += list( (self.memory[idx+last_offset][4] - self.memory[idx][4]) )
             f_action_target[i,:] = np.array(future_measurements)
+            print(state_input.shape,measurement_input.shape, goal_input.shape)
             state_input[i,:,:,:] = self.memory[idx][0]
             measurement_input[i,:] = self.memory[idx][4]
             action.append(self.memory[idx][1])
@@ -162,11 +163,26 @@ from depth_map import *
 import argparse
 import sys
 
+from termcolor import colored
+
+
 if __name__ == '__main__':
 
     title = sys.argv[1]
-    n_measures = int(sys.argv[2]) #number of measurements
+    n_measures = int(sys.argv[2])  # number of measurements
     more_perception = int(sys.argv[3])
+
+
+    sess = tf.Session() #session depth map
+    input_node, net = init_depth_map(sess)
+
+
+    # Avoid Tensorflow eats up GPU memory
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    sess2 = tf.Session(config=config)
+    K.set_session(sess2)
+
 
     game = DoomGame()
     game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
@@ -196,15 +212,19 @@ if __name__ == '__main__':
     state_size = (img_rows, img_cols, img_channels)
     agent = DFPAgent(state_size, measurement_size, action_size, timesteps)
 
-    agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps), agent.learning_rate)
+    agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
+                                       agent.learning_rate)
     # agent.load_model('./models/dfp.h5')
 
     x_t = game_state.screen_buffer  # 480 x 640
 
     if more_perception:
+
+        ############################################
+        #COMPUTE DEPTH MAP
+
+        '''
         img0 =  np.rollaxis(x_t, 0, 3)
-        #npimg = np.round(255 * img0)
-        #img = Image.fromarray(npimg, 'RGB')
 
         img0 = skimage.color.rgb2gray(img0)
         print(img0.shape)
@@ -214,14 +234,37 @@ if __name__ == '__main__':
         #img.show()
         img.save("tmp.jpg")
         img = Image.open("tmp.jpg")
-        depth_t = predict_depth_map(img)
+        '''
 
+        img0 = np.rollaxis(x_t, 0, 3)
+        npimg = np.round(255 * img0)
+        img = Image.fromarray(npimg, 'RGB')
+        img.save("state.jpg")
+
+        depth_t = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+
+        ############################################
+        # PROCESS IMAGE X_T (RESIZE AND TO GREYSCALE)
+        print(colored("TEST","red"))
+        print(x_t.shape)
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+        print(x_t.shape)
+
+        ############################################
+        #PROCESS_IMAGE DEPTH_T (RESIZE)
+
+        print(depth_t.shape)
         depth_t = transform.resize(depth_t, (img_rows, img_cols))
+        print(depth_t.shape)
+
+        ############################################
 
         s_t = np.zeros((2,img_rows, img_cols,4))
         s_t[0, :] = np.stack(([x_t]*4), axis=2)
         s_t[1, :] = np.stack(([depth_t] * 4), axis=2)
+
+        print(s_t.shape)
+
     else:
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
 
@@ -312,7 +355,14 @@ if __name__ == '__main__':
         misc = game_state.game_variables
 
         if more_perception:
-            depth_t1 = predict_depth_map(x_t1)
+
+            img0 = np.rollaxis(x_t1, 0, 3)
+            npimg = np.round(255 * img0)
+            img = Image.fromarray(npimg, 'RGB')
+            img.save("state.jpg")
+            depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+
+            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
             depth_t1 = transform.resize(depth_t1, (img_rows, img_cols))
 
             p_t1 = np.zeros((2, img_rows, img_cols, 1))
@@ -320,6 +370,9 @@ if __name__ == '__main__':
             p_t1[1, :] = np.expand_dims(depth_t1, axis=2)
 
             s_t1 = np.append(p_t1, s_t[:, :, :, :3], axis=3)
+
+            print(colored("TEST", "red"))
+            print(s_t1.shape)
 
         else:
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
@@ -350,22 +403,35 @@ if __name__ == '__main__':
             m_t = np.array([misc[0] / 30.0])
 
         # Do the training
+        '''
 
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        # Avoid Tensorflow eats up GPU memory
-        sess = tf.Session(config=config)
-        K.set_session(sess)
+        with tf.Graph().as_default() as net_graph:
+
+            agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
+                                               agent.learning_rate)
+
+            tf.global_variables_initializer().run()
+            model_saver = tf.train.Saver(tf.global_variables())
+
+            #https://stackoverflow.com/questions/39175945/run-multiple-pre-trained-tensorflow-nets-at-the-same-time
+
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
+            # Avoid Tensorflow eats up GPU memory
+
+            sess = tf.Session(config=config, graph = net_graph)
+            K.set_session(sess)
+
+            model_ckpt = tf.train.get_checkpoint_state()
+            model_saver.restore(sess, model_ckpt.model_checkpoint_path)
+
+            if t > agent.observe and t % agent.timestep_per_train == 0:
+                loss = agent.train_minibatch_replay(goal)
+        '''
 
         if t > agent.observe and t % agent.timestep_per_train == 0:
+            print("YES TRAIN")
             loss = agent.train_minibatch_replay(goal)
-
-        tf.global_variables_initializer().run()
-        model_saver = tf.train.Saver(tf.global_variables())
-        model_ckpt = tf.train.get_checkpoint_state()
-        model_saver.restore(sess, model_ckpt.model_checkpoint_path)
-
-        sess.close()
 
         s_t = s_t1
         t += 1
@@ -380,9 +446,9 @@ if __name__ == '__main__':
         if t <= agent.observe:
             state = "observe"
         elif t > agent.observe and t <= agent.observe + agent.explore:
-            state = "explore"
+            state = "explore" #train mais on continue à explorer 
         else:
-            state = "train"
+            state = "train" #train que en exploitant
 
 
         if (is_terminated):

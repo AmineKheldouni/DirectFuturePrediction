@@ -9,7 +9,6 @@ import models_depth
 
 def predict(model_data_path, image_path):
 
-    
     # Default input size
     height = 228
     width = 304
