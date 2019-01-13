@@ -15,7 +15,7 @@ def plot(exp,variable):
     plt.title(variable + 'through episodes')
     plt.show()
 
-  
+
 def compare(exps,variable, window=0, T=None):
     colors = ["red", "blue", "green", "yellow", "purple", "orange", "white", "black"]
     ax0 = None
@@ -26,7 +26,7 @@ def compare(exps,variable, window=0, T=None):
                               sep=',',
                               header=0)
         results = results[['Time',variable]].dropna()
-        
+
         if window>0:
            results[[variable]] = results[[variable]].rolling(window=window).mean()
 
@@ -49,19 +49,20 @@ def compare(exps,variable, window=0, T=None):
     for exp in exps: text+="_"+str(exp)
     plt.savefig(text)
     plt.show()
-    
+
 
 if __name__ == '__main__':
-    
+
     #variables = [Time,State,Epsilon,Action,Reward,Medkit,Poison,Frags,Amo,Max Life,Life,Mean Score,Var Score,Loss]
     exps = []
     for i in range(1,len(sys.argv)):
         exps.append(sys.argv[i])
-    compare(exps,'Medkit',window=20,T=50000)
+    compare(exps,'Medkit',window=20,T=None)
+    compare(exps,'Life',window=20,T=None)
 
-#Medkit, Life ????
-#Reward
-#Score recompute on Life
+    #Medkit, Life ????
+    #Reward
+    #Score recompute on Life
 
 
 #python3 process_results.py meas1 meas3

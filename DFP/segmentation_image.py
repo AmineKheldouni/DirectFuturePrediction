@@ -49,8 +49,8 @@ model.load_weights(COCO_MODEL_PATH, by_name=True)
 
 # COCO Class names
 # Index of the class in the list is its ID. For example, to get ID of
-# the teddy bear class, use: class_names.index('teddy bear')
-class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
+# the teddy bear class, use: CLASS_NAMES.index('teddy bear')
+CLASS_NAMES = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'bus', 'train', 'truck', 'boat', 'traffic light',
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
                'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
@@ -67,40 +67,52 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'teddy bear', 'hair drier', 'toothbrush']
 
 
-def display_medkit_mask(image, mask, class_ids, class_names):
+def display_medkit_mask(image, mask, regions, class_ids, scores, CLASS_NAMES):
     """Display the given image and the top few class masks."""
     to_display = []
     to_display.append(image)
     # Pick top prominent classes in this image
-    unique_class_ids = np.unique(class_ids)
-    print("unique class id: ", unique_class_ids)
-    print("class id: ", class_ids)
+    chosen_class_ids = []
+    if len(class_ids) > 0:
+        for i in range(len(class_ids)):
+            if not class_ids[i] in chosen_class_ids and class_ids[i] in [6,8]:
+                chosen_class_ids.append(class_ids[i])
+
     mask_area = [np.sum(mask[:, :, np.where(class_ids == i)[0]])
-                 for i in unique_class_ids]
-    top_ids = [v[0] for v in sorted(zip(unique_class_ids, mask_area),
+                 for i in chosen_class_ids]
+    top_ids = [v[0] for v in sorted(zip(chosen_class_ids, mask_area),
                                     key=lambda r: r[1], reverse=True) if v[1] > 0]
     # Generate images and titles
     class_id = top_ids[0] if 0 < len(top_ids) else -1
     # Pull masks of instances belonging to the same class.
-    m = mask[:, :, np.where(class_ids == class_id)[0]]
+    m = mask[:, :, np.where(class_ids == class_id)[0]].astype('float32')
     m = np.sum(m * np.arange(1, m.shape[-1] + 1), -1)
-    to_display.append(m)
-    visualize.display_images(to_display, titles=['simulator image', 'medkit mask'], cols= 2, cmap="Blues_r")
+    print(regions)
+
+    for i in range(len(regions)):
+        m[regions[i][0]:regions[i][2],regions[i][1]:regions[i][3]] = \
+        np.sign(m[regions[i][0]:regions[i][2],regions[i][1]:regions[i][3]]) * scores[i]
+
+    # to_display.append(m)
+    # visualize.display_images(to_display, titles=['simulator image', 'medkit mask'], cols= 2, cmap="Blues_r")
     return m
 
-# # Load a random image from the images folder
+def predict_segmentation(image):
+    results = model.detect([image], verbose=1)
+    # Visualize results
+    r = results[0]
+    visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
+                                CLASS_NAMES, r['scores'])
+    m = display_medkit_mask(image, r['masks'], r['rois'], r['class_ids'], r['scores'], CLASS_NAMES)
+
+    return m
+
+#
 # file_names = next(os.walk(IMAGE_DIR))[2]
 # # image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-# print(file_names)
-# for i in range(10):
+# # for i in range(10):
+# i = 6
+# image = skimage.io.imread(IMAGE_DIR+'/VizDoom/vizdoom' + str(i) + '.png')
 #
-#     image = skimage.io.imread(IMAGE_DIR+'/VizDoom/vizdoom' + str(i) + '.png')
-#
-#     # Run detection
-#     results = model.detect([image], verbose=1)
-#
-#     # Visualize results
-#     r = results[0]
-#     visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-#                                 class_names, r['scores'])
-#     display_medkit_mask(image, r['masks'], r['class_ids'], class_names)
+# # Run detection
+# segmentation = predict_segmentation(image)

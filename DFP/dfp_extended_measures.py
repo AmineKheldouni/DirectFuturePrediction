@@ -30,6 +30,7 @@ from time import sleep
 import tensorflow as tf
 
 from networks import Networks
+from segmentation_image import *
 
 #to check if keras is using GPU
 
@@ -165,9 +166,6 @@ from depth_map import *
 import argparse
 import sys
 
-from termcolor import colored
-
-
 if __name__ == '__main__':
 
     title = sys.argv[1]
@@ -251,6 +249,7 @@ if __name__ == '__main__':
         print("Loading agent's weights for Test session...")
         agent.epsilon = 0
         agent.load_model('../../experiments/'+title+'/model/DFP.h5')
+        agent.tend = 50000
 
     x_t = game_state.screen_buffer  # 480 x 640
 
@@ -263,7 +262,7 @@ if __name__ == '__main__':
         img = Image.fromarray(npimg, 'RGB')
         # img.save("state.jpg")
 
-        depth_t = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+        depth_t = predict_segmentation(img)
         depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
 
         ############################################
@@ -275,7 +274,8 @@ if __name__ == '__main__':
 
         depth_t = transform.resize(depth_t, (img_rows, img_cols))
         depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
-
+        plt.imshow(depth_t)
+        plt.show()
         ############################################
 
         s_t = np.zeros((img_rows, img_cols,2))
@@ -381,7 +381,8 @@ if __name__ == '__main__':
             npimg = np.round(255 * img0)
             img = Image.fromarray(npimg, 'RGB')
             # img.save("state.jpg")
-            depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+            # depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+            depth_t1 = predict_segmentation(img)
             depth_t1 = (depth_t1 - np.mean(depth_t1))/(np.max(depth_t1)-np.min(depth_t1))
 
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
