@@ -173,6 +173,7 @@ if __name__ == '__main__':
     more_perception = int(sys.argv[3])
     test_phase = int(sys.argv[4])
     d2_environment = int(sys.argv[5])
+    random_goal = int(sys.argv[6])
 
     sess = tf.Session()
     sess2 = tf.Session()
@@ -238,7 +239,7 @@ if __name__ == '__main__':
     if d2_environment:
        agent.observe = 50000
        agent.explore = 200000
-       tend = 210000
+       tend = 240000
     else:
        agent.observe = 2000
        agent.explore = 50000
@@ -339,8 +340,8 @@ if __name__ == '__main__':
     csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
     if test_phase:
         csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results_test.csv', sep=',', index=False)
-
-    inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
+    if random_goal:
+        inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
     while not game.is_episode_finished():
         loss = 0
         r_t = 0
@@ -367,7 +368,8 @@ if __name__ == '__main__':
             life_buffer.append(life)
             print ("Episode Finish ", misc)
             game.new_episode()
-            inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
+            if random_goal:
+                inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
             game_state = game.get_state()
             misc = game_state.game_variables
             x_t1 = game_state.screen_buffer
