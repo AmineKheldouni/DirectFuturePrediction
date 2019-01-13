@@ -49,10 +49,9 @@ class DFPAgent:
         self.epsilon = 1.0
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
-        self.batch_size = 64 #32
-
-        self.observe = 2000 #2000
-        self.explore = 50000
+        self.batch_size = 64
+        self.observe = 50000 #2000
+        self.explore = 200000
         self.frame_per_action = 4
         self.timestep_per_train = 5 #5 # Number of timesteps between training interval
 
@@ -246,8 +245,8 @@ if __name__ == '__main__':
        agent.observe = 2000
        agent.explore = 50000
        tend = 60000
-       
- 
+
+
     if test_phase:
         print("Loading agent's weights for Test session...")
         agent.epsilon = 0
@@ -338,7 +337,10 @@ if __name__ == '__main__':
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
                                      'Var Score', 'Loss'])
     csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+    if test_phase:
+        csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results_test.csv', sep=',', index=False)
 
+    inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
     while not game.is_episode_finished():
         loss = 0
         r_t = 0
@@ -365,6 +367,7 @@ if __name__ == '__main__':
             life_buffer.append(life)
             print ("Episode Finish ", misc)
             game.new_episode()
+            inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
             game_state = game.get_state()
             misc = game_state.game_variables
             x_t1 = game_state.screen_buffer
@@ -454,8 +457,12 @@ if __name__ == '__main__':
             else:
                mean_life = None
                var_life = None
+            path_result = '../../experiments/' + title + '/logs/' + 'results.csv'
 
-            with open('../../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
+            if test_phase:
+                path_result = '../../experiments/' + title + '/logs/' + 'results_test.csv'
+
+            with open(path_result, mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 writer.writerow([t, state, agent.epsilon, action_idx, r_t,
                                  medkit, poison, frags, amo, max_life, previous_life,
