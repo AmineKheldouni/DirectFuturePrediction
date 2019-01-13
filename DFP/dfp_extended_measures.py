@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import sys
+sys.path.append('../')
+
 import skimage as skimage
 from skimage import transform, color, exposure
 from skimage.viewer import ImageViewer
@@ -46,7 +49,8 @@ class DFPAgent:
         self.epsilon = 1.0
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
-        self.batch_size = 32
+        self.batch_size = 64 #32
+
         self.observe = 2000 #2000
         self.explore = 50000
         self.frame_per_action = 4
@@ -171,6 +175,7 @@ if __name__ == '__main__':
     n_measures = int(sys.argv[2])  # number of measurements
     more_perception = int(sys.argv[3])
     test_phase = int(sys.argv[4])
+    d2_environment = int(sys.argv[5])
 
     sess = tf.Session()
     sess2 = tf.Session()
@@ -195,9 +200,12 @@ if __name__ == '__main__':
     sess2 = tf.Session(config=config2)
     K.set_session(sess2)
 
-
     game = DoomGame()
-    game.load_config("../vizdoom/scenarios/health_gathering.cfg")
+
+    if d2_environment:
+        game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
+    else:
+        game.load_config("../vizdoom/scenarios/health_gathering.cfg")
 
     # TODO : Change amo/frags values when dealing with D3
     amo = 0
@@ -229,6 +237,17 @@ if __name__ == '__main__':
 
     agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
                                        agent.learning_rate)
+
+    if d2_environment:
+       agent.observe = 50000
+       agent.explore = 200000
+       tend = 210000
+    else:
+       agent.observe = 2000
+       agent.explore = 50000
+       tend = 60000
+       
+ 
     if test_phase:
         print("Loading agent's weights for Test session...")
         agent.epsilon = 0
@@ -461,7 +480,7 @@ if __name__ == '__main__':
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
                     stats_file.write('var_score: ' + str(agent.var_score) + '\n')
 
-        if t == 50000:
+        if t == tend:
             break
     sess.close()
     sess2.close()

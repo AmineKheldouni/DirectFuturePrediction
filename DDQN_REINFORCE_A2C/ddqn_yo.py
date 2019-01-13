@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import sys
+sys.path.append('../')
+
 import skimage as skimage
 from skimage import transform, color, exposure
 from skimage.viewer import ImageViewer
@@ -50,7 +53,7 @@ class DoubleDQNAgent:
         self.epsilon = 1.0
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
-        self.batch_size = 32
+        self.batch_size = 64 #32
         self.observe = 2000 #5000
         self.explore = 50000
         self.frame_per_action = 4
@@ -103,13 +106,18 @@ class DoubleDQNAgent:
 
         return r_t
 
-    def shape_reward_d1(self, r_t, misc, prev_misc, t):
-
-        if (prev_misc[0] - misc[0] > 8): #medkit
+    def shape_reward_d2(self, r_t, misc, prev_misc, t):
+        if (prev_misc[0] - misc[0] > 8): #poison
             r_t = r_t - 10
 
         if (misc[0] > prev_misc[0]): #medkit
             r_t = r_t + 10
+
+        return r_t
+
+    def shape_reward_d1(self, r_t, misc, prev_misc, t):
+        if (misc[0] > prev_misc[0]): #medkit
+             r_t = r_t + 10
 
         return r_t
 
@@ -223,6 +231,7 @@ if __name__ == "__main__":
 
     title = sys.argv[1]
     reshaped_reward = int(sys.argv[2])
+    d2_environment = int(sys.argv[3])
 
     # Avoid Tensorflow eats up GPU memory
     config = tf.ConfigProto()
@@ -231,8 +240,11 @@ if __name__ == "__main__":
     K.set_session(sess)
 
     game = DoomGame()
-    #game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
-    game.load_config("../vizdoom/scenarios/health_gathering.cfg")
+    if d2_environment:
+        game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
+    else:
+        game.load_config("../vizdoom/scenarios/health_gathering.cfg")
+
 
     #game.load_config("../vizdoom/scenarios/defend_the_center.cfg")
     game.set_sound_enabled(True)
@@ -254,6 +266,15 @@ if __name__ == "__main__":
 
     state_size = (img_rows, img_cols, img_channels)
     agent = DoubleDQNAgent(state_size, action_size)
+
+    if d2_environment:
+       agent.observe = 50000
+       agent.explore = 200000
+       tend = 210000
+    else:
+       agent.observe = 2000
+       agent.explore = 50000
+       tend = 60000
 
     agent.model = Networks.dqn(state_size, action_size, agent.learning_rate)
     agent.target_model = Networks.dqn(state_size, action_size, agent.learning_rate)
@@ -284,20 +305,20 @@ if __name__ == "__main__":
     # Buffer to compute rolling statistics
     life_buffer, ammo_buffer, kills_buffer = [], [], []
 
-    if not os.path.exists('../experiments/'+title):
-        os.mkdir('../experiments/'+title)
-    if not os.path.exists('./experiments/'+title+'/model'):
-        os.mkdir('../experiments/'+title+'/model')
-    if not os.path.exists('./experiments/'+title+'/logs'):
-        os.mkdir('../experiments/'+title+'/logs')
-    if not os.path.exists('./experiments/'+title+'/statistics'):
-        os.mkdir('../experiments/'+title+'/statistics')
+    if not os.path.exists('../../experiments/'+title):
+        os.mkdir('../../experiments/'+title)
+    if not os.path.exists('../../experiments/'+title+'/model'):
+        os.mkdir('../../experiments/'+title+'/model')
+    if not os.path.exists('../../experiments/'+title+'/logs'):
+        os.mkdir('../../experiments/'+title+'/logs')
+    if not os.path.exists('../../experiments/'+title+'/statistics'):
+        os.mkdir('../../experiments/'+title+'/statistics')
 
     csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
                                      'Reward', 'Medkit', 'Poison', 'Frags',
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
                                      'Var Score', 'Loss'])
-    csv_file.to_csv('../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+    csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
 
     while not game.is_episode_finished():
 
@@ -341,9 +362,10 @@ if __name__ == "__main__":
         s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
 
         if reshaped_reward:
-            r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t)
-        else:
-            pass
+            if d2_environment:
+               r_t = agent.shape_reward_d2(r_t, misc, prev_misc, t)
+            else:
+               r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t)
 
         if (prev_misc[0] - misc[0] > 8): # Pick up Poison
             poison += 1
@@ -373,7 +395,7 @@ if __name__ == "__main__":
 
         if t % 10000 == 0:
             print("Saving the model's parameters ...")
-            agent.model.save_weights('../experiments/'+title+'/model/ddqn.h5', overwrite=True)
+            agent.save_model('../../experiments/'+title+'/model/ddqn.h5')
 
         # print info
         state = ""
@@ -396,7 +418,7 @@ if __name__ == "__main__":
                mean_life = None
                var_life = None
 
-            with open('../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
+            with open('../../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 writer.writerow([t, state, agent.epsilon, action_idx, r_t,
                                  medkit, poison, frags, amo, max_life, previous_life,
@@ -417,7 +439,7 @@ if __name__ == "__main__":
                 life_buffer, ammo_buffer, kills_buffer = [], [], []
 
                 # Write Rolling Statistics to file
-                with open('../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
+                with open('../../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
                     stats_file.write('Game: ' + str(GAME) + '\n')
                     stats_file.write('Max Score: ' + str(max_life) + '\n')
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
@@ -426,5 +448,5 @@ if __name__ == "__main__":
                     stats_file.write('mavg_kill_counts: ' + str(agent.mavg_kill_counts) + '\n')
 
 
-        if t == 50000:
+        if t == tend:
            break
