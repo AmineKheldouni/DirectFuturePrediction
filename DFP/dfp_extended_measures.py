@@ -30,7 +30,7 @@ from time import sleep
 import tensorflow as tf
 
 from networks import Networks
-from segmentation_image import *
+# from segmentation_image import *
 
 #to check if keras is using GPU
 
@@ -263,7 +263,8 @@ if __name__ == '__main__':
         img = Image.fromarray(npimg, 'RGB')
         # img.save("state.jpg")
 
-        depth_t = predict_segmentation(img)
+        depth_t = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+        # depth_t = predict_segmentation(img)
         depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
 
         ############################################
@@ -383,8 +384,8 @@ if __name__ == '__main__':
             npimg = np.round(255 * img0)
             img = Image.fromarray(npimg, 'RGB')
             # img.save("state.jpg")
-            # depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
-            depth_t1 = predict_segmentation(img)
+            depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+            # depth_t1 = predict_segmentation(img)
             depth_t1 = (depth_t1 - np.mean(depth_t1))/(np.max(depth_t1)-np.min(depth_t1))
 
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
