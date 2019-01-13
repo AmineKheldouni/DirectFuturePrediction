@@ -26,7 +26,7 @@ def init_depth_map(sess):
 
     # Use to load from ckpt file
     saver = tf.train.Saver()
-    saver.restore(sess, "NYU_FCRN.ckpt")
+    saver.restore(sess, "../../weights/NYU_FCRN.ckpt")
 
     return input_node, net
 
@@ -85,7 +85,7 @@ def predict_depth_map(image, sess, input_node, net):
 
         # Use to load from ckpt file
         saver = tf.train.Saver()
-        saver.restore(sess, "NYU_FCRN.ckpt")
+        saver.restore(sess, "../../weights/NYU_FCRN.ckpt")
 
         # Use to load from npy file
         # net.load(model_data_path, sess)

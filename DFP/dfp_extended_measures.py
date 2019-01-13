@@ -47,7 +47,7 @@ class DFPAgent:
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
         self.batch_size = 32
-        self.observe = 100 #2000
+        self.observe = 2000 #2000
         self.explore = 50000
         self.frame_per_action = 4
         self.timestep_per_train = 5 #5 # Number of timesteps between training interval
@@ -98,7 +98,7 @@ class DFPAgent:
         batch_size = min(self.batch_size, len(self.memory))
         rand_indices = np.random.choice(len(self.memory)-(self.timesteps[-1]+1), self.batch_size)
 
-        state_input = np.zeros(((batch_size,) + self.state_size)) # Shape batch_size, img_rows, img_cols, 4
+        state_input = np.zeros(((batch_size,) + self.state_size)) # Shape batch_size, img_rows, img_cols, img_channels
         measurement_input = np.zeros((batch_size, self.measurement_size))
         goal_input = np.tile(goal, (batch_size, 1))
         f_action_target = np.zeros((batch_size, (self.measurement_size * len(self.timesteps))))
@@ -121,8 +121,7 @@ class DFPAgent:
                     if j in self.timesteps: # 1,2,4,8,16,32
                         future_measurements += list( (self.memory[idx+last_offset][4] - self.memory[idx][4]) )
             f_action_target[i,:] = np.array(future_measurements)
-            print(state_input.shape,measurement_input.shape, goal_input.shape)
-            state_input[i,:,:,:] = self.memory[idx][0]
+            state_input[i,:,:,:] = self.memory[idx][0][0,:,:,:]
             measurement_input[i,:] = self.memory[idx][4]
             action.append(self.memory[idx][1])
 
@@ -141,7 +140,7 @@ class DFPAgent:
 
     # save the model which is under training
     def save_model(self, name):
-        self.model.save_weights(name)
+        self.model.save_weights(name, overwrite=True)
 
 
 def preprocessImg(img, size):
@@ -171,21 +170,34 @@ if __name__ == '__main__':
     title = sys.argv[1]
     n_measures = int(sys.argv[2])  # number of measurements
     more_perception = int(sys.argv[3])
+    test_phase = int(sys.argv[4])
 
+    sess = tf.Session()
+    sess2 = tf.Session()
+    try:
+        sess.close()
+    except NameError:
+        pass
+        try:
+            sess2.close()
+        except NameError:
+            pass
 
-    sess = tf.Session() #session depth map
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    sess = tf.Session(config=config) #session depth map
     input_node, net = init_depth_map(sess)
 
 
     # Avoid Tensorflow eats up GPU memory
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    sess2 = tf.Session(config=config)
+    config2 = tf.ConfigProto()
+    config2.gpu_options.allow_growth = True
+    sess2 = tf.Session(config=config2)
     K.set_session(sess2)
 
 
     game = DoomGame()
-    game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
+    game.load_config("../vizdoom/scenarios/health_gathering.cfg")
 
     # TODO : Change amo/frags values when dealing with D3
     amo = 0
@@ -207,14 +219,20 @@ if __name__ == '__main__':
 
     img_rows , img_cols = 84, 84
     # Convert image into Black and white
-    img_channels = 4 # We stack 4 frames
+    if more_perception:
+        img_channels = 2 # We stack 1 frame (then we will put 2 other channels: depth map and segmented image)
+    else:
+        img_channels = 1
 
     state_size = (img_rows, img_cols, img_channels)
     agent = DFPAgent(state_size, measurement_size, action_size, timesteps)
 
     agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
                                        agent.learning_rate)
-    # agent.load_model('./models/dfp.h5')
+    if test_phase:
+        print("Loading agent's weights for Test session...")
+        agent.epsilon = 0
+        agent.load_model('../../experiments/'+title+'/model/DFP.h5')
 
     x_t = game_state.screen_buffer  # 480 x 640
 
@@ -222,56 +240,37 @@ if __name__ == '__main__':
 
         ############################################
         #COMPUTE DEPTH MAP
-
-        '''
-        img0 =  np.rollaxis(x_t, 0, 3)
-
-        img0 = skimage.color.rgb2gray(img0)
-        print(img0.shape)
-        npimg = np.round(255 * img0)
-        img = Image.fromarray(npimg).convert("RGB")
-
-        #img.show()
-        img.save("tmp.jpg")
-        img = Image.open("tmp.jpg")
-        '''
-
         img0 = np.rollaxis(x_t, 0, 3)
         npimg = np.round(255 * img0)
         img = Image.fromarray(npimg, 'RGB')
-        img.save("state.jpg")
+        # img.save("state.jpg")
 
         depth_t = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+        depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
 
         ############################################
         # PROCESS IMAGE X_T (RESIZE AND TO GREYSCALE)
-        print(colored("TEST","red"))
-        print(x_t.shape)
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
-        print(x_t.shape)
 
         ############################################
         #PROCESS_IMAGE DEPTH_T (RESIZE)
 
-        print(depth_t.shape)
         depth_t = transform.resize(depth_t, (img_rows, img_cols))
-        print(depth_t.shape)
+        depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
 
         ############################################
 
-        s_t = np.zeros((2,img_rows, img_cols,4))
-        s_t[0, :] = np.stack(([x_t]*4), axis=2)
-        s_t[1, :] = np.stack(([depth_t] * 4), axis=2)
-
-        print(s_t.shape)
+        s_t = np.zeros((img_rows, img_cols,2))
+        s_t[:,:,0] = x_t # It becomes 64x64x2
+        s_t[:,:,1] = depth_t
+        s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
 
     else:
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+        s_t = np.expand_dims(x_t, axis=2) # It becomes 64x64x1
+        s_t = np.expand_dims(s_t, axis=0) # 1x64x64x1
 
-        s_t = np.stack(([x_t]*4), axis=2) # It becomes 64x64x4
-        s_t = np.expand_dims(s_t, axis=0) # 1x64x64x4
-        
-    
+
     # Number of medkit pickup as measurement
     medkit = 0
 
@@ -306,20 +305,20 @@ if __name__ == '__main__':
     # Buffer to compute rolling statistics
     life_buffer = []
 
-    if not os.path.exists('../experiments/'+title):
-        os.mkdir('../experiments/'+title)
-    if not os.path.exists('./experiments/'+title+'/model'):
-        os.mkdir('../experiments/'+title+'/model')
-    if not os.path.exists('./experiments/'+title+'/logs'):
-        os.mkdir('../experiments/'+title+'/logs')
-    if not os.path.exists('./experiments/'+title+'/statistics'):
-        os.mkdir('../experiments/'+title+'/statistics')
+    if not os.path.exists('../../experiments/'+title):
+        os.mkdir('../../experiments/'+title)
+    if not os.path.exists('../../experiments/'+title+'/model'):
+        os.mkdir('../../experiments/'+title+'/model')
+    if not os.path.exists('../../experiments/'+title+'/logs'):
+        os.mkdir('../../experiments/'+title+'/logs')
+    if not os.path.exists('../../experiments/'+title+'/statistics'):
+        os.mkdir('../../experiments/'+title+'/statistics')
 
     csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
                                      'Reward', 'Medkit', 'Poison', 'Frags',
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
                                      'Var Score', 'Loss'])
-    csv_file.to_csv('../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+    csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
 
     while not game.is_episode_finished():
         loss = 0
@@ -338,7 +337,7 @@ if __name__ == '__main__':
         game_state = game.get_state()  # Observe again after we take the action
         is_terminated = game.is_episode_finished()
 
-        r_t = game.get_last_reward() 
+        r_t = game.get_last_reward()
 
         if (is_terminated):
             if (life > max_life):
@@ -359,25 +358,24 @@ if __name__ == '__main__':
             img0 = np.rollaxis(x_t1, 0, 3)
             npimg = np.round(255 * img0)
             img = Image.fromarray(npimg, 'RGB')
-            img.save("state.jpg")
+            # img.save("state.jpg")
             depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
+            depth_t1 = (depth_t1 - np.mean(depth_t1))/(np.max(depth_t1)-np.min(depth_t1))
 
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
             depth_t1 = transform.resize(depth_t1, (img_rows, img_cols))
 
-            p_t1 = np.zeros((2, img_rows, img_cols, 1))
-            p_t1[0, :] = np.expand_dims(x_t1, axis=2)
-            p_t1[1, :] = np.expand_dims(depth_t1, axis=2)
+            p_t1 = np.zeros((img_rows, img_cols, 2))
+            p_t1[:,:,0] = x_t1
+            p_t1[:,:,1] = depth_t1
+            p_t1 = np.expand_dims(p_t1, axis=0) # 1x64x64x2
 
-            s_t1 = np.append(p_t1, s_t[:, :, :, :3], axis=3)
-
-            print(colored("TEST", "red"))
-            print(s_t1.shape)
+            s_t1 = p_t1
 
         else:
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
             x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
-            s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
+            s_t1 = x_t1
 
 
         if (prev_misc[0] - misc[0] > 8): # Pick up Poison
@@ -394,62 +392,37 @@ if __name__ == '__main__':
         # Update the cache
         prev_misc = misc
 
-        # save the sample <s, a, r, s'> to the replay memory and decrease epsilon
-        agent.replay_memory(s_t, action_idx, r_t, s_t1, m_t, is_terminated)
+        if not test_phase:
+            # save the sample <s, a, r, s'> to the replay memory and decrease epsilon
+            agent.replay_memory(s_t, action_idx, r_t, s_t1, m_t, is_terminated)
 
         if n_measures==3:
             m_t = np.array([misc[0] / 30.0, medkit/10.0, poison]) # Measurement after transition
         elif n_measures == 1:
             m_t = np.array([misc[0] / 30.0])
 
-        # Do the training
-        '''
-
-        with tf.Graph().as_default() as net_graph:
-
-            agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
-                                               agent.learning_rate)
-
-            tf.global_variables_initializer().run()
-            model_saver = tf.train.Saver(tf.global_variables())
-
-            #https://stackoverflow.com/questions/39175945/run-multiple-pre-trained-tensorflow-nets-at-the-same-time
-
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            # Avoid Tensorflow eats up GPU memory
-
-            sess = tf.Session(config=config, graph = net_graph)
-            K.set_session(sess)
-
-            model_ckpt = tf.train.get_checkpoint_state()
-            model_saver.restore(sess, model_ckpt.model_checkpoint_path)
-
-            if t > agent.observe and t % agent.timestep_per_train == 0:
-                loss = agent.train_minibatch_replay(goal)
-        '''
-
-        if t > agent.observe and t % agent.timestep_per_train == 0:
-            print("YES TRAIN")
+        if t > agent.observe and t % agent.timestep_per_train == 0 and not test_phase:
+            # print("DO TRAIN")
             loss = agent.train_minibatch_replay(goal)
 
         s_t = s_t1
         t += 1
 
         # save progress every 10000 iterations
-        if t % 10000 == 0:
-            print("Saving the model's parameters ...")
-            agent.model.save_weights('../experiments/'+title+'/model/DFP.h5', overwrite=True)
+        if t % 10000 == 0 and not test_phase:
+            agent.save_model('../../experiments/'+title+'/model/DFP.h5')
 
         # print info
         state = ""
         if t <= agent.observe:
             state = "observe"
         elif t > agent.observe and t <= agent.observe + agent.explore:
-            state = "explore" #train mais on continue à explorer 
+            state = "explore/train" #train mais on continue à explorer
         else:
-            state = "train" #train que en exploitant
+            state = "exploit/train" #train que en exploitant
 
+        if test_phase:
+            state = "test"
 
         if (is_terminated):
             print("TIME", t, "/ GAME", GAME, "/ STATE", state, \
@@ -463,7 +436,7 @@ if __name__ == '__main__':
                mean_life = None
                var_life = None
 
-            with open('../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
+            with open('../../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 writer.writerow([t, state, agent.epsilon, action_idx, r_t,
                                  medkit, poison, frags, amo, max_life, previous_life,
@@ -482,7 +455,7 @@ if __name__ == '__main__':
                 life_buffer = []
 
                 # Write Rolling Statistics to file
-                with open('../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
+                with open('../../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
                     stats_file.write('Game: ' + str(GAME) + '\n')
                     stats_file.write('Max Score: ' + str(max_life) + '\n')
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
@@ -490,3 +463,5 @@ if __name__ == '__main__':
 
         if t == 50000:
             break
+    sess.close()
+    sess2.close()

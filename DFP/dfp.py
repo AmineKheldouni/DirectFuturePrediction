@@ -167,7 +167,7 @@ if __name__ == '__main__':
     K.set_session(sess)
 
     game = DoomGame()
-    game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
+    game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
 
     # TODO : Change amo/frags values when dealing with D3
     amo = 0
@@ -272,7 +272,7 @@ if __name__ == '__main__':
         game_state = game.get_state()  # Observe again after we take the action
         is_terminated = game.is_episode_finished()
 
-        r_t = game.get_last_reward() 
+        r_t = game.get_last_reward()
 
         if (is_terminated):
             if (life > max_life):
