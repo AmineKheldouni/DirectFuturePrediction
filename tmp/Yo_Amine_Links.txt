@@ -1,0 +1,44 @@
+https://www.overleaf.com/project/5bf579b1a5705a15960824d7
+
+
+
+Consigns :
+https://docs.google.com/document/d/1mDYW9hgpLQSu42pIBnHwL_klPIYV9HBZckA79xaDJSs/edit
+
+
+
+Docu VizDoom Game :
+https://github.com/mwydmuch/ViZDoom/blob/master/doc/DoomGame.md
+
+
+
+Stanfordien :
+https://flyyufelix.github.io/2017/10/12/dqn-vs-pg.html
+https://github.com/flyyufelix/VizDoom-Keras-RL
+
+https://flyyufelix.github.io/2017/11/17/direct-future-prediction.html
+https://github.com/flyyufelix/VizDoom-Keras-RL
+
+
+
+Article and Video :
+https://arxiv.org/pdf/1611.01779.pdf
+https://github.com/IntelVCL/DirectFuturePrediction
+https://www.youtube.com/watch?v=buUF5F8UCH8
+
+
+
+Blogs on DFP :
+https://blog.acolyer.org/2017/05/12/learning-to-act-by-predicting-the-future/
+https://danieltakeshi.github.io/2017/10/10/learning-to-act-by-predicting-the-future/
+https://www.reddit.com/r/MachineLearning/comments/6aq0qk/r_learning_to_act_by_predicting_the_future_using/
+
+
+
+RL DQN Course :
+https://piazza.com/class/jieazpzar8j5p0?cid=19
+
+
+Car simulator
+http://proceedings.mlr.press/v78/dosovitskiy17a/dosovitskiy17a.pdf
+
