@@ -34,7 +34,7 @@ def preprocessImg(img, size):
     img = skimage.color.rgb2gray(img)
 
     return img
-    
+
 
 class DoubleDQNAgent:
 
@@ -52,9 +52,9 @@ class DoubleDQNAgent:
         self.final_epsilon = 0.0001
         self.batch_size = 32
         self.observe = 2000 #5000
-        self.explore = 50000 
+        self.explore = 50000
         self.frame_per_action = 4
-        self.update_target_freq = 3000 
+        self.update_target_freq = 3000
         self.timestep_per_train = 5 #100 # Number of timesteps between training interval
 
         # create replay memory using deque
@@ -90,7 +90,7 @@ class DoubleDQNAgent:
         return action_idx
 
     def shape_reward_d3(self, r_t, misc, prev_misc, t):
-        
+
         # Check any kill count
         if (misc[0] > prev_misc[0]):
             r_t = r_t + 1
@@ -174,7 +174,7 @@ class DoubleDQNAgent:
         num_samples = min(self.batch_size * self.timestep_per_train, len(self.memory))
         replay_samples = random.sample(self.memory, num_samples)
 
-        update_input = np.zeros(((num_samples,) + self.state_size)) 
+        update_input = np.zeros(((num_samples,) + self.state_size))
         update_target = np.zeros(((num_samples,) + self.state_size))
         action, reward, done = [], [], []
 
@@ -185,7 +185,7 @@ class DoubleDQNAgent:
             update_target[i,:,:,:] = replay_samples[i][3]
             done.append(replay_samples[i][4])
 
-        target = self.model.predict(update_input) 
+        target = self.model.predict(update_input)
         target_val = self.model.predict(update_target)
         target_val_ = self.target_model.predict(update_target)
 
@@ -217,7 +217,7 @@ import argparse
 import sys
 import os
 import pandas as pd
-import csv 
+import csv
 
 if __name__ == "__main__":
 
@@ -231,10 +231,10 @@ if __name__ == "__main__":
     K.set_session(sess)
 
     game = DoomGame()
-    #game.load_config("vizdoom/scenarios/health_gathering_supreme.cfg")
-    game.load_config("vizdoom/scenarios/health_gathering.cfg")
+    #game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
+    game.load_config("../vizdoom/scenarios/health_gathering.cfg")
 
-    #game.load_config("vizdoom/scenarios/defend_the_center.cfg")
+    #game.load_config("../vizdoom/scenarios/defend_the_center.cfg")
     game.set_sound_enabled(True)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
@@ -281,8 +281,8 @@ if __name__ == "__main__":
     max_life = 0 # Maximum episode life (Proxy for agent performance)
     life = 0
 
-    # Buffer to compute rolling statistics 
-    life_buffer, ammo_buffer, kills_buffer = [], [], [] 
+    # Buffer to compute rolling statistics
+    life_buffer, ammo_buffer, kills_buffer = [], [], []
 
     if not os.path.exists('../experiments/'+title):
         os.mkdir('../experiments/'+title)
@@ -365,12 +365,12 @@ if __name__ == "__main__":
         # Do the training
         if t > agent.observe and t % agent.timestep_per_train == 0:
             Q_max, loss = agent.train_replay()
-            
+
         s_t = s_t1
         t += 1
 
         # save progress every 10000 iterations
-        
+
         if t % 10000 == 0:
             print("Saving the model's parameters ...")
             agent.model.save_weights('../experiments/'+title+'/model/ddqn.h5', overwrite=True)
@@ -406,7 +406,7 @@ if __name__ == "__main__":
             poison = 0
 
             # Save Agent's Performance Statistics
-            if GAME % agent.stats_window_size == 0 and t > agent.observe: 
+            if GAME % agent.stats_window_size == 0 and t > agent.observe:
                 print("Update Rolling Statistics")
                 agent.mavg_score.append(np.mean(np.array(life_buffer)))
                 agent.var_score.append(np.var(np.array(life_buffer)))
@@ -414,7 +414,7 @@ if __name__ == "__main__":
                 agent.mavg_kill_counts.append(np.mean(np.array(kills_buffer)))
 
                 # Reset rolling stats buffer
-                life_buffer, ammo_buffer, kills_buffer = [], [], [] 
+                life_buffer, ammo_buffer, kills_buffer = [], [], []
 
                 # Write Rolling Statistics to file
                 with open('../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
@@ -428,4 +428,3 @@ if __name__ == "__main__":
 
         if t == 50000:
            break
-
