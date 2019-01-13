@@ -7,7 +7,7 @@ plt.style.use('ggplot')
 
 
 def plot(exp,variable):
-    results = pd.read_csv('./experiments/' + exp + '/logs/' + 'results.csv',
+    results = pd.read_csv('../experiments/' + exp + '/logs/' + 'results.csv',
                           sep=',',
                           header=0)
 
@@ -15,12 +15,12 @@ def plot(exp,variable):
     plt.title(variable + 'through episodes')
     plt.show()
 
-  
+
 def compare(exps,variable):
     colors = ["red", "blue", "green", "yellow", "purple", "orange", "white", "black"]
     ax0 = None
     for (i,exp) in enumerate(exps):
-        results = pd.read_csv('./experiments/' + exp + '/logs/' + 'results.csv',
+        results = pd.read_csv('../experiments/' + exp + '/logs/' + 'results.csv',
                               sep=',',
                               header=0)
         results = results[['Time',variable]].dropna()
@@ -34,14 +34,15 @@ def compare(exps,variable):
     for exp in exps: text+="_"+str(exp)
     plt.savefig(text)
     plt.show()
-    
+
 
 if __name__ == '__main__':
-    
+
     #variables = [Time,State,Epsilon,Action,Reward,Medkit,Poison,Frags,Amo,Max Life,Life,Mean Score,Var Score,Loss]
     exps = []
     for i in range(1,len(sys.argv)):
         exps.append(sys.argv[i])
+    compare(exps,'Life')
     compare(exps,'Mean Score')
 
 
