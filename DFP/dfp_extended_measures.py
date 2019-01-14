@@ -388,7 +388,8 @@ if __name__ == '__main__':
             GAME += 1
             life_buffer.append(life)
             print ("Episode Finish ", misc)
-
+            amo = misc[0]
+            frags = misc[2]
             game.new_episode()
             if random_goal:
                 inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
@@ -437,8 +438,6 @@ if __name__ == '__main__':
         else:
             life += 1
 
-        amo = misc[0]
-        frags = misc[2]
 
         # Update the cache
         prev_misc = misc
