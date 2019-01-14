@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import sys
-sys.path.append('../')
-
 import skimage as skimage
 from skimage import transform, color, exposure
 from skimage.viewer import ImageViewer
@@ -37,7 +34,7 @@ def preprocessImg(img, size):
     img = skimage.color.rgb2gray(img)
 
     return img
-
+    
 
 class DoubleDQNAgent:
 
@@ -49,27 +46,27 @@ class DoubleDQNAgent:
 
         # these is hyper parameters for the Double DQN
         self.gamma = 0.99
-        self.learning_rate = 0.0001 # 0.00001 #0.0001
+        self.learning_rate = 0.0001
         self.epsilon = 1.0
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
-        self.batch_size = 64 #32
-        self.observe = 2000 #5000
-        self.explore = 50000
+        self.batch_size = 32
+        self.observe = 5000
+        self.explore = 50000 
         self.frame_per_action = 4
-        self.update_target_freq = 3000
-        self.timestep_per_train = 5 #100 # Number of timesteps between training interval
+        self.update_target_freq = 3000 
+        self.timestep_per_train = 100 # Number of timesteps between training interval
 
         # create replay memory using deque
         self.memory = deque()
-        self.max_memory = 20000 # 50000 # number of previous transitions to remember
+        self.max_memory = 50000 # number of previous transitions to remember
 
         # create main model and target model
         self.model = None
         self.target_model = None
 
         # Performance Statistics
-        self.stats_window_size= 5 # window size for computing rolling statistics
+        self.stats_window_size= 50 # window size for computing rolling statistics
         self.mavg_score = [] # Moving Average of Survival Time
         self.var_score = [] # Variance of Survival Time
         self.mavg_ammo_left = [] # Moving Average of Ammo used
@@ -92,8 +89,8 @@ class DoubleDQNAgent:
             action_idx = np.argmax(q)
         return action_idx
 
-    def shape_reward_d3(self, r_t, misc, prev_misc, t):
-
+    def shape_reward(self, r_t, misc, prev_misc, t):
+        
         # Check any kill count
         if (misc[0] > prev_misc[0]):
             r_t = r_t + 1
@@ -103,21 +100,6 @@ class DoubleDQNAgent:
 
         if (misc[2] < prev_misc[2]): # Loss HEALTH
             r_t = r_t - 0.1
-
-        return r_t
-
-    def shape_reward_d2(self, r_t, misc, prev_misc, t):
-        if (prev_misc[0] - misc[0] > 8): #poison
-            r_t = r_t - 10
-
-        if (misc[0] > prev_misc[0]): #medkit
-            r_t = r_t + 10
-
-        return r_t
-
-    def shape_reward_d1(self, r_t, misc, prev_misc, t):
-        if (misc[0] > prev_misc[0]): #medkit
-             r_t = r_t + 10
 
         return r_t
 
@@ -182,7 +164,7 @@ class DoubleDQNAgent:
         num_samples = min(self.batch_size * self.timestep_per_train, len(self.memory))
         replay_samples = random.sample(self.memory, num_samples)
 
-        update_input = np.zeros(((num_samples,) + self.state_size))
+        update_input = np.zeros(((num_samples,) + self.state_size)) 
         update_target = np.zeros(((num_samples,) + self.state_size))
         action, reward, done = [], [], []
 
@@ -193,7 +175,7 @@ class DoubleDQNAgent:
             update_target[i,:,:,:] = replay_samples[i][3]
             done.append(replay_samples[i][4])
 
-        target = self.model.predict(update_input)
+        target = self.model.predict(update_input) 
         target_val = self.model.predict(update_target)
         target_val_ = self.target_model.predict(update_target)
 
@@ -221,17 +203,8 @@ class DoubleDQNAgent:
     def save_model(self, name):
         self.model.save_weights(name)
 
-import argparse
-import sys
-import os
-import pandas as pd
-import csv
 
 if __name__ == "__main__":
-
-    title = sys.argv[1]
-    reshaped_reward = int(sys.argv[2])
-    d2_environment = int(sys.argv[3])
 
     # Avoid Tensorflow eats up GPU memory
     config = tf.ConfigProto()
@@ -240,13 +213,7 @@ if __name__ == "__main__":
     K.set_session(sess)
 
     game = DoomGame()
-    if d2_environment:
-        game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
-    else:
-        game.load_config("../vizdoom/scenarios/health_gathering.cfg")
-
-
-    #game.load_config("../vizdoom/scenarios/defend_the_center.cfg")
+    game.load_config("vizdoom/scenarios/defend_the_center.cfg")
     game.set_sound_enabled(True)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
@@ -259,22 +226,12 @@ if __name__ == "__main__":
 
     action_size = game.get_available_buttons_size()
 
-    img_rows , img_cols = 84, 84
-    #img_rows , img_cols = 64, 64
+    img_rows , img_cols = 64, 64
     # Convert image into Black and white
     img_channels = 4 # We stack 4 frames
 
     state_size = (img_rows, img_cols, img_channels)
     agent = DoubleDQNAgent(state_size, action_size)
-
-    if d2_environment:
-       agent.observe = 50000
-       agent.explore = 200000
-       tend = 210000
-    else:
-       agent.observe = 5000
-       agent.explore = 100000
-       tend = 110000
 
     agent.model = Networks.dqn(state_size, action_size, agent.learning_rate)
     agent.target_model = Networks.dqn(state_size, action_size, agent.learning_rate)
@@ -283,15 +240,6 @@ if __name__ == "__main__":
     x_t = preprocessImg(x_t, size=(img_rows, img_cols))
     s_t = np.stack(([x_t]*4), axis=2) # It becomes 64x64x4
     s_t = np.expand_dims(s_t, axis=0) # 1x64x64x4
-
-    # Number of medkit pickup as measurement
-    medkit = 0
-
-    # Number of poison pickup as measurement
-    poison = 0
-
-    frags = 0
-    amo = 0
 
     is_terminated = game.is_episode_finished()
 
@@ -302,23 +250,8 @@ if __name__ == "__main__":
     max_life = 0 # Maximum episode life (Proxy for agent performance)
     life = 0
 
-    # Buffer to compute rolling statistics
-    life_buffer, ammo_buffer, kills_buffer = [], [], []
-
-    if not os.path.exists('../../experiments/'+title):
-        os.mkdir('../../experiments/'+title)
-    if not os.path.exists('../../experiments/'+title+'/model'):
-        os.mkdir('../../experiments/'+title+'/model')
-    if not os.path.exists('../../experiments/'+title+'/logs'):
-        os.mkdir('../../experiments/'+title+'/logs')
-    if not os.path.exists('../../experiments/'+title+'/statistics'):
-        os.mkdir('../../experiments/'+title+'/statistics')
-
-    csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
-                                     'Reward', 'Medkit', 'Poison', 'Frags',
-                                     'Amo', 'Max Life', 'Life', 'Mean Score',
-                                     'Var Score', 'Loss'])
-    csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+    # Buffer to compute rolling statistics 
+    life_buffer, ammo_buffer, kills_buffer = [], [], [] 
 
     while not game.is_episode_finished():
 
@@ -346,8 +279,8 @@ if __name__ == "__main__":
                 max_life = life
             GAME += 1
             life_buffer.append(life)
-            #ammo_buffer.append(misc[1])
-            #kills_buffer.append(misc[0])
+            ammo_buffer.append(misc[1])
+            kills_buffer.append(misc[0])
             print ("Episode Finish ", misc)
             game.new_episode()
             game_state = game.get_state()
@@ -361,18 +294,8 @@ if __name__ == "__main__":
         x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
         s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
 
-        if reshaped_reward:
-            if d2_environment:
-               r_t = agent.shape_reward_d2(r_t, misc, prev_misc, t)
-            else:
-               r_t = agent.shape_reward_d1(r_t, misc, prev_misc, t)
+        r_t = agent.shape_reward(r_t, misc, prev_misc, t)
 
-        if (prev_misc[0] - misc[0] > 8): # Pick up Poison
-            poison += 1
-        if (misc[0] > prev_misc[0]): # Pick up Health Pack
-            medkit += 1
-
-        previous_life = life
         if (is_terminated):
             life = 0
         else:
@@ -387,15 +310,14 @@ if __name__ == "__main__":
         # Do the training
         if t > agent.observe and t % agent.timestep_per_train == 0:
             Q_max, loss = agent.train_replay()
-
+            
         s_t = s_t1
         t += 1
 
         # save progress every 10000 iterations
-
         if t % 10000 == 0:
-            print("Saving the model's parameters ...")
-            agent.save_model('../../experiments/'+title+'/model/ddqn.h5')
+            print("Now we save model")
+            agent.model.save_weights("models/ddqn.h5", overwrite=True)
 
         # print info
         state = ""
@@ -411,24 +333,8 @@ if __name__ == "__main__":
                   "/ EPSILON", agent.epsilon, "/ ACTION", action_idx, "/ REWARD", r_t, \
                   "/ Q_MAX %e" % np.max(Q_max), "/ LIFE", max_life, "/ LOSS", loss)
 
-            if GAME % agent.stats_window_size == 0 and t > agent.observe:
-               mean_life = np.mean(np.array(life_buffer))
-               var_life = np.var(np.array(life_buffer))
-            else:
-               mean_life = None
-               var_life = None
-
-            with open('../../experiments/' + title + '/logs/' + 'results.csv', mode='a') as log_file:
-                writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                writer.writerow([t, state, agent.epsilon, action_idx, r_t,
-                                 medkit, poison, frags, amo, max_life, previous_life,
-                                 mean_life, var_life, loss])
-
-            medkit = 0
-            poison = 0
-
             # Save Agent's Performance Statistics
-            if GAME % agent.stats_window_size == 0 and t > agent.observe:
+            if GAME % agent.stats_window_size == 0 and t > agent.observe: 
                 print("Update Rolling Statistics")
                 agent.mavg_score.append(np.mean(np.array(life_buffer)))
                 agent.var_score.append(np.var(np.array(life_buffer)))
@@ -436,10 +342,10 @@ if __name__ == "__main__":
                 agent.mavg_kill_counts.append(np.mean(np.array(kills_buffer)))
 
                 # Reset rolling stats buffer
-                life_buffer, ammo_buffer, kills_buffer = [], [], []
+                life_buffer, ammo_buffer, kills_buffer = [], [], [] 
 
                 # Write Rolling Statistics to file
-                with open('../../experiments/'+title+'/statistics/stats.txt', 'w+') as stats_file:
+                with open("statistics/ddqn_stats.txt", "w") as stats_file:
                     stats_file.write('Game: ' + str(GAME) + '\n')
                     stats_file.write('Max Score: ' + str(max_life) + '\n')
                     stats_file.write('mavg_score: ' + str(agent.mavg_score) + '\n')
@@ -447,6 +353,3 @@ if __name__ == "__main__":
                     stats_file.write('mavg_ammo_left: ' + str(agent.mavg_ammo_left) + '\n')
                     stats_file.write('mavg_kill_counts: ' + str(agent.mavg_kill_counts) + '\n')
 
-
-        if t == tend:
-           break

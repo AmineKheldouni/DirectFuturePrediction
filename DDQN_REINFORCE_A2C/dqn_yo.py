@@ -54,7 +54,7 @@ class DoubleDQNAgent:
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.0001
         self.batch_size = 64 #32
-        self.observe = 2000 #5000
+        self.observe = 2 #2000 #5000
         self.explore = 50000
         self.frame_per_action = 4
         self.update_target_freq = 3000
@@ -131,8 +131,8 @@ class DoubleDQNAgent:
             self.memory.popleft()
 
         # Update the target model to be same with model
-        if t % self.update_target_freq == 0:
-            self.update_target_model()
+        #if t % self.update_target_freq == 0:
+        #    self.update_target_model()
 
     # Pick samples randomly from replay memory (with batch_size)
     def train_minibatch_replay(self):
@@ -150,13 +150,13 @@ class DoubleDQNAgent:
             update_input[i,:,:,:] = mini_batch[i][0]
             action.append(mini_batch[i][1])
             reward.append(mini_batch[i][2])
-            update_target[i,:,:,:] = mini_batch[i][3]
+            #update_target[i,:,:,:] = mini_batch[i][3]
             done.append(mini_batch[i][4])
 
         target = self.model.predict(update_input) # Shape 64, Num_Actions
 
         target_val = self.model.predict(update_target)
-        target_val_ = self.target_model.predict(update_target)
+        #target_val_ = self.target_model.predict(update_target)
 
         for i in range(self.batch_size):
             # like Q Learning, get maximum Q value at s'
@@ -168,7 +168,8 @@ class DoubleDQNAgent:
                 # selection of action is from model
                 # update is from target model
                 a = np.argmax(target_val[i])
-                target[i][action[i]] = reward[i] + self.gamma * (target_val_[i][a])
+                target[i][action[i]] = reward[i] + self.gamma * target_val[i][a]
+                #target[i][action[i]] = reward[i] + self.gamma * (target_val_[i][a])
 
         # make minibatch which includes target q value and predicted q value
         # and do the model fit!
@@ -195,7 +196,8 @@ class DoubleDQNAgent:
 
         target = self.model.predict(update_input)
         target_val = self.model.predict(update_target)
-        target_val_ = self.target_model.predict(update_target)
+        
+        #target_val_ = self.target_model.predict(update_target)
 
         for i in range(num_samples):
             # like Q Learning, get maximum Q value at s'
@@ -207,7 +209,8 @@ class DoubleDQNAgent:
                 # selection of action is from model
                 # update is from target model
                 a = np.argmax(target_val[i])
-                target[i][action[i]] = reward[i] + self.gamma * (target_val_[i][a])
+                target[i][action[i]] = reward[i] + self.gamma * target_val[i][a]
+                #target[i][action[i]] = reward[i] + self.gamma * (target_val_[i][a])
 
         loss = self.model.fit(update_input, target, batch_size=self.batch_size, nb_epoch=1, verbose=0)
 
@@ -276,8 +279,10 @@ if __name__ == "__main__":
        agent.explore = 100000
        tend = 110000
 
+    print(agent.observe)
+
     agent.model = Networks.dqn(state_size, action_size, agent.learning_rate)
-    agent.target_model = Networks.dqn(state_size, action_size, agent.learning_rate)
+    #agent.target_model = Networks.dqn(state_size, action_size, agent.learning_rate)
 
     x_t = game_state.screen_buffer # 480 x 640
     x_t = preprocessImg(x_t, size=(img_rows, img_cols))
@@ -395,7 +400,7 @@ if __name__ == "__main__":
 
         if t % 10000 == 0:
             print("Saving the model's parameters ...")
-            agent.save_model('../../experiments/'+title+'/model/ddqn.h5')
+            agent.save_model('../../experiments/'+title+'/model/dqn.h5')
 
         # print info
         state = ""
