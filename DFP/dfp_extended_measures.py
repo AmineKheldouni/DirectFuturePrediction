@@ -172,7 +172,7 @@ if __name__ == '__main__':
     n_measures = int(sys.argv[2])  # number of measurements
     more_perception = int(sys.argv[3])
     test_phase = int(sys.argv[4])
-    d2_environment = int(sys.argv[5])
+    d_env = int(sys.argv[5])
     random_goal = int(sys.argv[6])
 
     sess = tf.Session()
@@ -200,14 +200,13 @@ if __name__ == '__main__':
 
     game = DoomGame()
 
-    if d2_environment:
+    if d_env==1:
         game.load_config("../vizdoom/scenarios/health_gathering_supreme.cfg")
-    else:
+    elif d_env==0:
         game.load_config("../vizdoom/scenarios/health_gathering.cfg")
+    elif d_env==2:
+        game.load_config("../vizdoom/scenarios/D3.cfg")
 
-    # TODO : Change amo/frags values when dealing with D3
-    amo = 0
-    frags = 0
     game.set_sound_enabled(False)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
@@ -236,14 +235,19 @@ if __name__ == '__main__':
     agent.model = Networks.dfp_network(state_size, measurement_size, goal_size, action_size, len(timesteps),
                                        agent.learning_rate)
 
-    if d2_environment:
+    if d_env==1:
        agent.observe = 50000
        agent.explore = 200000
        tend = 240000
-    else:
+    elif d_env==0:
        agent.observe = 2000
        agent.explore = 50000
        tend = 60000
+    elif d_env==2:
+       agent.observe = 50000
+       agent.explore = 250000
+       tend = 300000
+
 
 
     if test_phase:
@@ -297,16 +301,29 @@ if __name__ == '__main__':
     # Number of poison pickup as measurement
     poison = 0
 
+    # D3
+    amo = 0
+    frags = 0
+
     # Initial normalized measurements
     assert(n_measures in [1,3])
     if n_measures==3:
-        m_t = np.array([misc[0]/30.0, medkit/10.0, poison])
+        if d_env != 2:
+            m_t = np.array([misc[0]/30.0, medkit/10.0, poison])
+        else:
+            m_t = np.array([misc[0]/10.0, misc[1]/30.0, misc[2]])   # [AMO, HEALTH, FRAGS]
     elif n_measures==1:
-        m_t = np.array([misc[0] / 30.0])
+        if d_env != 2:
+            m_t = np.array([misc[0] / 30.0])
+        else:
+            m_t = np.array([misc[1]/30.0])   # [HEALTH]
 
     # Goal
     if n_measures == 3:
-        goal = np.array([1.0, 1.0, -1.0] * len(timesteps))
+        if d_env != 2:
+            goal = np.array([1.0, 1.0, -1.0] * len(timesteps))
+        else:
+            goal = np.array([0.5, 0.5, 1.0] * len(timesteps))
     elif n_measures==1:
         goal = np.array([1.0] * len(timesteps))
 
@@ -338,11 +355,14 @@ if __name__ == '__main__':
                                      'Reward', 'Medkit', 'Poison', 'Frags',
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
                                      'Var Score', 'Loss'])
-    csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
     if test_phase:
         csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results_test.csv', sep=',', index=False)
+    else:
+        csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results.csv', sep=',', index=False)
+
     if random_goal:
         inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
+
     while not game.is_episode_finished():
         loss = 0
         r_t = 0
@@ -368,6 +388,7 @@ if __name__ == '__main__':
             GAME += 1
             life_buffer.append(life)
             print ("Episode Finish ", misc)
+
             game.new_episode()
             if random_goal:
                 inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
@@ -409,11 +430,15 @@ if __name__ == '__main__':
         if (misc[0] > prev_misc[0]): # Pick up Health Pack
             medkit += 1
 
+
         previous_life = life
         if (is_terminated):
             life = 0
         else:
             life += 1
+
+        amo = misc[0]
+        frags = misc[2]
 
         # Update the cache
         prev_misc = misc
@@ -453,7 +478,7 @@ if __name__ == '__main__':
         if (is_terminated):
             print("TIME", t, "/ GAME", GAME, "/ STATE", state, \
                   "/ EPSILON", agent.epsilon, "/ ACTION", action_idx, "/ REWARD", r_t, \
-                  "/ Medkit", medkit, "/ Poison", poison, "/ LIFE", max_life, "/ LOSS", loss)
+                  "/ Medkit", medkit, "/ Poison", poison, "/ Amo", amo, "/Frags", frags, "/MAX_LIFE", max_life, "/LIFE", previous_life, "/ LOSS", loss)
 
             if GAME % agent.stats_window_size == 0 and t > agent.observe:
                mean_life = np.mean(np.array(life_buffer))
@@ -461,10 +486,11 @@ if __name__ == '__main__':
             else:
                mean_life = None
                var_life = None
-            path_result = '../../experiments/' + title + '/logs/' + 'results.csv'
 
             if test_phase:
                 path_result = '../../experiments/' + title + '/logs/' + 'results_test.csv'
+            else:
+                path_result = '../../experiments/' + title + '/logs/' + 'results.csv'
 
             with open(path_result, mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -474,7 +500,8 @@ if __name__ == '__main__':
 
             medkit = 0
             poison = 0
-
+            amo = 0
+            frags = 0
             # Save Agent's Performance Statistics
             if GAME % agent.stats_window_size == 0 and t > agent.observe:
                 print("Update Rolling Statistics")
