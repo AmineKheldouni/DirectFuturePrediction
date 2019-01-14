@@ -10,8 +10,8 @@ import models_depth
 
 def init_depth_map(sess):
     # Default input size
-    height = 228
-    width = 304
+    height = 228 #480 #
+    width = 304 #640 #
     channels = 3
     batch_size = 1
 
@@ -34,8 +34,8 @@ def init_depth_map(sess):
 
 def predict_depth_map(image, sess, input_node, net):
     # Default input size
-    height = 228
-    width = 304
+    height =228 # 480 #
+    width = 304 #640 #
     channels = 3
     batch_size = 1
 

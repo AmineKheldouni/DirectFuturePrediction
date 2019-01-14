@@ -69,4 +69,6 @@ class Networks(object):
         adam = Adam(lr=learning_rate)
         model.compile(loss='mse',optimizer=adam)
 
+        model.summary()
+
         return model
