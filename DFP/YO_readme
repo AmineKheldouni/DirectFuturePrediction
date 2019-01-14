@@ -3,3 +3,6 @@ https://github.com/iro-cp/FCRN-DepthPrediction
 
 to predict depth map
 python predict.py NYU_FCRN.ckpt yourimage.jpg
+
+for VM download:
+/home/aminekheldouni/DFP_PROJECT/experiments/train_D2_random_negpos_goal_240000/logs/results.csv
