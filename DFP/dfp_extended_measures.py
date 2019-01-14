@@ -301,10 +301,9 @@ if __name__ == '__main__':
     # Number of poison pickup as measurement
     poison = 0
 
-    # D3
-    amo = 0
     frags = 0
-
+    amo = 0
+    health = 0
     # Initial normalized measurements
     assert(n_measures in [1,3])
     if n_measures==3:
@@ -354,7 +353,7 @@ if __name__ == '__main__':
     csv_file = pd.DataFrame(columns=['Time', 'State', 'Epsilon', 'Action',
                                      'Reward', 'Medkit', 'Poison', 'Frags',
                                      'Amo', 'Max Life', 'Life', 'Mean Score',
-                                     'Var Score', 'Loss'])
+                                     'Var Score', 'Health', 'Loss'])
     if test_phase:
         csv_file.to_csv('../../experiments/' + title + '/logs/' + 'results_test.csv', sep=',', index=False)
     else:
@@ -378,6 +377,14 @@ if __name__ == '__main__':
         game.advance_action(skiprate)
 
         game_state = game.get_state()  # Observe again after we take the action
+
+        if d_env == 2:
+            amo = misc[0]
+            health = misc[1]
+            frags = misc[2]
+        else:
+            health = misc[0]
+
         is_terminated = game.is_episode_finished()
 
         r_t = game.get_last_reward()
@@ -388,8 +395,12 @@ if __name__ == '__main__':
             GAME += 1
             life_buffer.append(life)
             print ("Episode Finish ", misc)
-            amo = misc[0]
-            frags = misc[2]
+            if d_env == 2:
+                amo = misc[0]
+                health = misc[1]
+                frags = misc[2]
+            else:
+                health = misc[0]
             game.new_episode()
             if random_goal:
                 inference_goal = goal = np.array(list(np.random.uniform(-1, 1, n_measures)) * len(timesteps))
@@ -425,11 +436,16 @@ if __name__ == '__main__':
             x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
             s_t1 = x_t1
 
-
-        if (prev_misc[0] - misc[0] > 8): # Pick up Poison
-            poison += 1
-        if (misc[0] > prev_misc[0]): # Pick up Health Pack
-            medkit += 1
+        if d_env != 2:
+            if (prev_misc[0] - misc[0] > 8): # Pick up Poison
+                poison += 1
+            if (misc[0] > prev_misc[0]): # Pick up Health Pack
+                medkit += 1
+        else:
+            if (prev_misc[1] - misc[1] > 8): # Pick up Poison
+                poison += 1
+            if (misc[1] > prev_misc[1]): # Pick up Health Pack
+                medkit += 1
 
 
         previous_life = life
@@ -447,7 +463,11 @@ if __name__ == '__main__':
             agent.replay_memory(s_t, action_idx, r_t, s_t1, m_t, is_terminated)
 
         if n_measures==3:
-            m_t = np.array([misc[0] / 30.0, medkit/10.0, poison]) # Measurement after transition
+            if d_env !=2:
+                m_t = np.array([misc[0] / 30.0, medkit/10.0, poison]) # Measurement after transition
+            else:
+                m_t = np.array([misc[0]/10.0, misc[1]/30.0, misc[2]])   # [AMO, HEALTH, FRAGS]
+
         elif n_measures == 1:
             m_t = np.array([misc[0] / 30.0])
 
@@ -477,8 +497,7 @@ if __name__ == '__main__':
         if (is_terminated):
             print("TIME", t, "/ GAME", GAME, "/ STATE", state, \
                   "/ EPSILON", agent.epsilon, "/ ACTION", action_idx, "/ REWARD", r_t, \
-                  "/ Medkit", medkit, "/ Poison", poison, "/ Amo", amo, "/Frags", frags, "/MAX_LIFE", max_life, "/LIFE", previous_life, "/ LOSS", loss)
-
+                  "/ Medkit", medkit, "/ Poison", poison, "/ Amo", amo, "/Frags", frags, "/ MAX_LIFE", max_life, "/ LIFE", previous_life, "/ HEALTH", health, "/ LOSS", loss)
             if GAME % agent.stats_window_size == 0 and t > agent.observe:
                mean_life = np.mean(np.array(life_buffer))
                var_life = np.var(np.array(life_buffer))
@@ -494,13 +513,11 @@ if __name__ == '__main__':
             with open(path_result, mode='a') as log_file:
                 writer = csv.writer(log_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 writer.writerow([t, state, agent.epsilon, action_idx, r_t,
-                                 medkit, poison, frags, amo, max_life, previous_life,
-                                 mean_life, var_life, loss])
+                             medkit, poison, frags, amo, max_life, previous_life,
+                             mean_life, var_life, health, loss])
 
             medkit = 0
             poison = 0
-            amo = 0
-            frags = 0
             # Save Agent's Performance Statistics
             if GAME % agent.stats_window_size == 0 and t > agent.observe:
                 print("Update Rolling Statistics")
