@@ -216,7 +216,7 @@ if __name__ == '__main__':
     game.set_labels_buffer_enabled(True)
 
     # Enables depth buffer.
-    # game.set_depth_buffer_enabled(True)
+    game.set_depth_buffer_enabled(True)
 
     # Enables buffer with top down map of he current episode/level .
     # game.set_automap_buffer_enabled(True)
@@ -278,36 +278,19 @@ if __name__ == '__main__':
     x_t = game_state.screen_buffer  # 480 x 640
 
     if depth_perception:
-
-        ############################################
-        #COMPUTE DEPTH MAP
-        img0 = np.rollaxis(x_t, 0, 3)
-        npimg = np.round(255 * img0)
-        img = Image.fromarray(npimg, 'RGB')
-        # img.save("state.jpg")
-
-        depth_t = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
-        # depth_t = predict_segmentation(img)
-        depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
-
-        ############################################
-        # PROCESS IMAGE X_T (RESIZE AND TO GREYSCALE)
+        # Compute mask
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
-
-        ############################################
-        #PROCESS_IMAGE DEPTH_T (RESIZE)
-
-        depth_t = transform.resize(depth_t, (img_rows, img_cols))
-        depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
-        # plt.imshow(depth_t)
-        # plt.show()
-        ############################################
-
-        s_t = np.zeros((img_rows, img_cols,2))
-        s_t[:,:,0] = x_t # It becomes 64x64x2
-        s_t[:,:,1] = depth_t
-        s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
-
+        depth = game_state.depth_buffer
+        depth = transform.resize(depth, (img_rows, img_cols))
+        if depth is not None:
+            s_t = np.zeros((img_rows, img_cols,2))
+            s_t[:,:,0] = x_t # It becomes 64x64x2
+            s_t[:,:,1] = depth
+            s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
+        else:
+            x_t = preprocessImg(x_t1, size=(img_rows, img_cols))
+            x_t = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+            s_t = x_t
     if mask_perception and not game.is_episode_finished():
         # Compute mask
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
@@ -444,24 +427,20 @@ if __name__ == '__main__':
         misc = game_state.game_variables
 
         if depth_perception:
-
-            img0 = np.rollaxis(x_t1, 0, 3)
-            npimg = np.round(255 * img0)
-            img = Image.fromarray(npimg, 'RGB')
-            # img.save("state.jpg")
-            depth_t1 = predict_depth_map(img, sess, input_node, net)[0, :, :, 0]
-            # depth_t1 = predict_segmentation(img)
-            depth_t1 = (depth_t1 - np.mean(depth_t1))/(np.max(depth_t1)-np.min(depth_t1))
-
+            # Compute mask
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
-            depth_t1 = transform.resize(depth_t1, (img_rows, img_cols))
-
-            p_t1 = np.zeros((img_rows, img_cols, 2))
-            p_t1[:,:,0] = x_t1
-            p_t1[:,:,1] = depth_t1
-            p_t1 = np.expand_dims(p_t1, axis=0) # 1x64x64x2
-
-            s_t1 = p_t1
+            depth = game_state.depth_buffer
+            depth = transform.resize(depth, (img_rows, img_cols))
+            print("depth: ", depth.sum())
+            if depth is not None:
+                s_t1 = np.zeros((img_rows, img_cols,2))
+                s_t1[:,:,0] = x_t # It becomes 64x64x2
+                s_t1[:,:,1] = depth
+                s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
+            else:
+                x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+                x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+                s_t1 = x_t1
 
         if mask_perception and not game.is_episode_finished():
             # Compute mask
