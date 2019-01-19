@@ -431,7 +431,6 @@ if __name__ == '__main__':
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
             depth = game_state.depth_buffer
             depth = transform.resize(depth, (img_rows, img_cols))
-            print("depth: ", depth.sum())
             if depth is not None:
                 s_t1 = np.zeros((img_rows, img_cols,2))
                 s_t1[:,:,0] = x_t # It becomes 64x64x2
