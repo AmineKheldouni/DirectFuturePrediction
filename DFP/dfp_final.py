@@ -28,7 +28,6 @@ from vizdoom import *
 import itertools as it
 from time import sleep
 import tensorflow as tf
-import cv2
 
 from networks import Networks
 # from segmentation_image import *
