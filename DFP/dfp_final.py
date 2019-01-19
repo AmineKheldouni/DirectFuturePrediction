@@ -276,37 +276,63 @@ if __name__ == '__main__':
         agent.tend = 50000
 
     x_t = game_state.screen_buffer  # 480 x 640
+    x_t = preprocessImg(x_t, size=(img_rows, img_cols))
 
-    if depth_perception:
-        # Compute mask
-        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+    if depth_perception and mask_perception and not game.is_episode_finished():
+
+        # Compute depth
         depth = game_state.depth_buffer
-        depth = transform.resize(depth, (img_rows, img_cols))
+        depth = skimage.transform.resize(depth, (img_rows, img_cols))
+
+        # Compute mask
+        mask = game_state.labels_buffer
+        mask = skimage.transform.resize(mask, (img_rows, img_cols))
+
+        if depth is not None and mask is not None:
+            s_t = np.zeros((img_rows, img_cols,3))
+            s_t[:,:,0] = x_t
+            s_t[:,:,1] = depth
+            s_t[:,:,2] = mask
+            s_t = np.expand_dims(s_t, axis=0) # 1x64x64x3
+        elif depth is not None:
+            s_t = np.zeros((img_rows, img_cols,2))
+            s_t[:,:,0] = x_t
+            s_t[:,:,1] = depth
+            s_t = np.expand_dims(s_t, axis=0) # 1x64x64x3
+        elif mask is not None:
+            s_t = np.zeros((img_rows, img_cols,2))
+            s_t[:,:,0] = x_t
+            s_t[:,:,1] = mask
+            s_t = np.expand_dims(s_t, axis=0) # 1x64x64x3
+        else:
+            x_t = np.reshape(x_t, (1, img_rows, img_cols, 1))
+            s_t = x_t
+    elif depth_perception:
+        # Compute depth
+        depth = game_state.depth_buffer
+        depth = skimage.transform.resize(depth, (img_rows, img_cols))
         if depth is not None:
             s_t = np.zeros((img_rows, img_cols,2))
-            s_t[:,:,0] = x_t # It becomes 64x64x2
+            s_t[:,:,0] = x_t
             s_t[:,:,1] = depth
             s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
         else:
-            x_t = preprocessImg(x_t1, size=(img_rows, img_cols))
-            x_t = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+            x_t = np.reshape(x_t, (1, img_rows, img_cols, 1))
             s_t = x_t
-    if mask_perception and not game.is_episode_finished():
+    elif mask_perception and not game.is_episode_finished():
         # Compute mask
-        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
         mask = game_state.labels_buffer
-        mask = transform.resize(mask, (img_rows, img_cols))
+        mask = skimage.transform.resize(mask, (img_rows, img_cols))
+
         if mask is not None:
             s_t = np.zeros((img_rows, img_cols,2))
             s_t[:,:,0] = x_t # It becomes 64x64x2
             s_t[:,:,1] = mask
             s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
         else:
-            x_t = preprocessImg(x_t1, size=(img_rows, img_cols))
-            x_t = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+            x_t = np.reshape(x_t, (1, img_rows, img_cols, 1))
             s_t = x_t
-    if not mask_perception and not depth_perception:
-        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+    else:
         s_t = np.expand_dims(x_t, axis=2) # It becomes 64x64x1
         s_t = np.expand_dims(s_t, axis=0) # 1x64x64x1
 
@@ -424,42 +450,66 @@ if __name__ == '__main__':
             x_t1 = game_state.screen_buffer
 
         x_t1 = game_state.screen_buffer
+        x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
         misc = game_state.game_variables
 
-        if depth_perception:
-            # Compute mask
-            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+        if depth_perception and mask_perception and not game.is_episode_finished():
+            # Compute depth
             depth = game_state.depth_buffer
-            depth = transform.resize(depth, (img_rows, img_cols))
-            if depth is not None:
+            depth = skimage.transform.resize(depth, (img_rows, img_cols))
+            # Compute mask
+            mask = game_state.labels_buffer
+            mask = skimage.transform.resize(mask, (img_rows, img_cols))
+
+            if depth is not None and mask is not None:
+                s_t1 = np.zeros((img_rows, img_cols,3))
+                s_t1[:,:,0] = x_t1
+                s_t1[:,:,1] = depth
+                s_t1[:,:,2] = mask
+                s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x3
+            elif depth is not None:
                 s_t1 = np.zeros((img_rows, img_cols,2))
-                s_t1[:,:,0] = x_t # It becomes 64x64x2
+                s_t1[:,:,0] = x_t1
                 s_t1[:,:,1] = depth
                 s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
-            else:
-                x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
-                x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
-                s_t1 = x_t1
-
-        if mask_perception and not game.is_episode_finished():
-            # Compute mask
-            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
-            mask = game_state.labels_buffer
-            mask = transform.resize(mask, (img_rows, img_cols))
-            if mask is not None:
+            elif mask is not None:
                 s_t1 = np.zeros((img_rows, img_cols,2))
-                s_t1[:,:,0] = x_t # It becomes 64x64x2
+                s_t1[:,:,0] = x_t1
                 s_t1[:,:,1] = mask
                 s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
             else:
-                x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
                 x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
                 s_t1 = x_t1
+        elif depth_perception:
+            # Compute depth
+            depth = game_state.depth_buffer
+            depth = skimage.transform.resize(depth, (img_rows, img_cols))
+            if depth is not None:
+                s_t1 = np.zeros((img_rows, img_cols,2))
+                s_t1[:,:,0] = x_t1
+                s_t1[:,:,1] = depth
+                s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
+            else:
+                x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+                s_t1 = x_t1
+        elif mask_perception and not game.is_episode_finished():
+            # Compute mask
+            mask = game_state.labels_buffer
+            mask = skimage.transform.resize(mask, (img_rows, img_cols))
 
-        if not depth_perception and not mask_perception:
-            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+            if mask is not None:
+                s_t1 = np.zeros((img_rows, img_cols,2))
+                s_t1[:,:,0] = x_t1 # It becomes 64x64x2
+                s_t1[:,:,1] = mask
+                s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
+            else:
+                x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+                s_t1 = x_t1
+        else:
             x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
             s_t1 = x_t1
+        print("s_t1 shape: ", s_t1.shape)
+
 
         if d_env != 2:
             if (prev_misc[0] - misc[0] > 8): # Pick up Poison
@@ -495,9 +545,15 @@ if __name__ == '__main__':
 
         elif n_measures == 1:
             m_t = np.array([misc[0] / 30.0])
-
+        if depth_perception:
+            plt.imshow(depth)
+            plt.show()
+        if mask_perception:
+            plt.imshow(mask)
+            plt.show()
         if t > agent.observe and t % agent.timestep_per_train == 0 and not test_phase:
             # print("DO TRAIN")
+
             loss = agent.train_minibatch_replay(goal)
 
         s_t = s_t1
@@ -561,6 +617,5 @@ if __name__ == '__main__':
 
         if t == tend:
             break
-    # cv2.destroyAllWindows()
     sess.close()
     sess2.close()
