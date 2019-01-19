@@ -28,6 +28,7 @@ from vizdoom import *
 import itertools as it
 from time import sleep
 import tensorflow as tf
+import cv2
 
 from networks import Networks
 # from segmentation_image import *
@@ -170,10 +171,11 @@ if __name__ == '__main__':
 
     title = sys.argv[1]
     n_measures = int(sys.argv[2])  # number of measurements
-    more_perception = int(sys.argv[3])
-    test_phase = int(sys.argv[4])
-    d_env = int(sys.argv[5])
-    random_goal = int(sys.argv[6])
+    depth_perception = int(sys.argv[3])
+    mask_perception = int(sys.argv[4])
+    test_phase = int(sys.argv[5])
+    d_env = int(sys.argv[6])
+    random_goal = int(sys.argv[7])
 
     sess = tf.Session()
     sess2 = tf.Session()
@@ -210,10 +212,27 @@ if __name__ == '__main__':
     game.set_sound_enabled(False)
     game.set_screen_resolution(ScreenResolution.RES_640X480)
     game.set_window_visible(False)
+
+    # Enables labeling of in game objects labeling.
+    game.set_labels_buffer_enabled(True)
+
+    # Enables depth buffer.
+    # game.set_depth_buffer_enabled(True)
+
+    # Enables buffer with top down map of he current episode/level .
+    # game.set_automap_buffer_enabled(True)
+
     game.init()
 
     game.new_episode()
     game_state = game.get_state()
+
+    if not game.is_episode_finished():
+        labels = game_state.labels_buffer
+        # if labels is not None:
+            # plt.imshow(labels)
+            # plt.show()
+
     misc = game_state.game_variables  # [Health]
     prev_misc = misc
 
@@ -224,10 +243,11 @@ if __name__ == '__main__':
 
     img_rows , img_cols = 84, 84
     # Convert image into Black and white
-    if more_perception:
-        img_channels = 2 # We stack 1 frame (then we will put 2 other channels: depth map and segmented image)
-    else:
-        img_channels = 1
+    img_channels = 1
+    if depth_perception:
+        img_channels += 1 # We stack 1 frame (then we will put 2 other channels: depth map and segmented image)
+    if mask_perception:
+        img_channels += 1
 
     state_size = (img_rows, img_cols, img_channels)
     agent = DFPAgent(state_size, measurement_size, action_size, timesteps)
@@ -258,7 +278,7 @@ if __name__ == '__main__':
 
     x_t = game_state.screen_buffer  # 480 x 640
 
-    if more_perception:
+    if depth_perception:
 
         ############################################
         #COMPUTE DEPTH MAP
@@ -280,8 +300,8 @@ if __name__ == '__main__':
 
         depth_t = transform.resize(depth_t, (img_rows, img_cols))
         depth_t = (depth_t - np.mean(depth_t))/(np.max(depth_t)-np.min(depth_t))
-        plt.imshow(depth_t)
-        plt.show()
+        # plt.imshow(depth_t)
+        # plt.show()
         ############################################
 
         s_t = np.zeros((img_rows, img_cols,2))
@@ -289,7 +309,21 @@ if __name__ == '__main__':
         s_t[:,:,1] = depth_t
         s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
 
-    else:
+    if mask_perception and not game.is_episode_finished():
+        # Compute mask
+        x_t = preprocessImg(x_t, size=(img_rows, img_cols))
+        mask = game_state.labels_buffer
+        mask = transform.resize(mask, (img_rows, img_cols))
+        if mask is not None:
+            s_t = np.zeros((img_rows, img_cols,2))
+            s_t[:,:,0] = x_t # It becomes 64x64x2
+            s_t[:,:,1] = mask
+            s_t = np.expand_dims(s_t, axis=0) # 1x64x64x2
+        else:
+            x_t = preprocessImg(x_t1, size=(img_rows, img_cols))
+            x_t = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+            s_t = x_t
+    if not mask_perception and not depth_perception:
         x_t = preprocessImg(x_t, size=(img_rows, img_cols))
         s_t = np.expand_dims(x_t, axis=2) # It becomes 64x64x1
         s_t = np.expand_dims(s_t, axis=0) # 1x64x64x1
@@ -410,7 +444,7 @@ if __name__ == '__main__':
         x_t1 = game_state.screen_buffer
         misc = game_state.game_variables
 
-        if more_perception:
+        if depth_perception:
 
             img0 = np.rollaxis(x_t1, 0, 3)
             npimg = np.round(255 * img0)
@@ -430,7 +464,22 @@ if __name__ == '__main__':
 
             s_t1 = p_t1
 
-        else:
+        if mask_perception and not game.is_episode_finished():
+            # Compute mask
+            x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+            mask = game_state.labels_buffer
+            mask = transform.resize(mask, (img_rows, img_cols))
+            if mask is not None:
+                s_t1 = np.zeros((img_rows, img_cols,2))
+                s_t1[:,:,0] = x_t # It becomes 64x64x2
+                s_t1[:,:,1] = mask
+                s_t1 = np.expand_dims(s_t1, axis=0) # 1x64x64x2
+            else:
+                x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
+                x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
+                s_t1 = x_t1
+
+        if not depth_perception and not mask_perception:
             x_t1 = preprocessImg(x_t1, size=(img_rows, img_cols))
             x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
             s_t1 = x_t1
@@ -535,5 +584,6 @@ if __name__ == '__main__':
 
         if t == tend:
             break
+    # cv2.destroyAllWindows()
     sess.close()
     sess2.close()
