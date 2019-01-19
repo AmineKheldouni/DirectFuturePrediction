@@ -508,7 +508,6 @@ if __name__ == '__main__':
         else:
             x_t1 = np.reshape(x_t1, (1, img_rows, img_cols, 1))
             s_t1 = x_t1
-        print("s_t1 shape: ", s_t1.shape)
 
 
         if d_env != 2:
@@ -545,15 +544,14 @@ if __name__ == '__main__':
 
         elif n_measures == 1:
             m_t = np.array([misc[0] / 30.0])
-        if depth_perception:
-            plt.imshow(depth)
-            plt.show()
-        if mask_perception:
-            plt.imshow(mask)
-            plt.show()
+        # if depth_perception:
+        #     plt.imshow(depth)
+        #     plt.show()
+        # if mask_perception:
+        #     plt.imshow(mask)
+        #     plt.show()
         if t > agent.observe and t % agent.timestep_per_train == 0 and not test_phase:
             # print("DO TRAIN")
-
             loss = agent.train_minibatch_replay(goal)
 
         s_t = s_t1
