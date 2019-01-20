@@ -254,7 +254,7 @@ if __name__ == '__main__':
                                        agent.learning_rate)
 
     if d_env==1:
-       agent.observe = 100000
+       agent.observe = 50000
        agent.explore = 350000
        tend = 500000
     elif d_env==0:
