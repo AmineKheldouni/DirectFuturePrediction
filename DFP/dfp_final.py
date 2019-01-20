@@ -128,7 +128,6 @@ class DFPAgent:
             state_input[i,:,:,:] = self.memory[idx][0][0,:,:,:]
             measurement_input[i,:] = self.memory[idx][4]
             action.append(self.memory[idx][1])
-
         f_target = self.model.predict([state_input, measurement_input, goal_input]) # Shape [32x18,32x18,32x18]
 
         for i in range(self.batch_size):
@@ -255,9 +254,9 @@ if __name__ == '__main__':
                                        agent.learning_rate)
 
     if d_env==1:
-       agent.observe = 50000
-       agent.explore = 200000
-       tend = 240000
+       agent.observe = 100000
+       agent.explore = 350000
+       tend = 500000
     elif d_env==0:
        agent.observe = 2000
        agent.explore = 50000
